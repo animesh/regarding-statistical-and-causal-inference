@@ -3,1196 +3,978 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pearl's Causal Inference — Interactive Simulation</title>
+<title>Pearl Mediation — Full Nonlinear NDE/NIE</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
 
-  :root {
-    --bg: #0a0e14;
-    --panel: #111720;
-    --border: #1e2d40;
-    --obs: #3b82f6;
-    --causal: #f59e0b;
-    --confound: #ef4444;
-    --mediator: #10b981;
-    --text: #e2e8f0;
-    --dim: #64748b;
-    --bright: #f8fafc;
-  }
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #21262d;
+  --border2: #30363d;
+  --NDE:     #58a6ff;
+  --NIE:     #3fb950;
+  --TE:      #f0883e;
+  --int:     #bc8cff;
+  --warn:    #f85149;
+  --dim:     #8b949e;
+  --text:    #c9d1d9;
+  --bright:  #f0f6fc;
+}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'IBM Plex Sans', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Crimson Pro', Georgia, serif;
+  min-height: 100vh;
+}
 
-  header {
-    padding: 24px 32px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-  }
+/* ── Header ── */
+.header {
+  padding: 20px 28px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+}
+.header h1 {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.95rem; font-weight: 600;
+  color: var(--TE); letter-spacing: -0.01em;
+}
+.header .sub {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem; color: var(--dim);
+}
 
-  header h1 {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--causal);
-    letter-spacing: -0.02em;
-  }
+/* ── Model tabs ── */
+.model-strip {
+  display: flex; gap: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px; overflow-x: auto;
+}
+.mtab {
+  padding: 9px 18px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem; color: var(--dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s; white-space: nowrap;
+}
+.mtab:hover { color: var(--text); }
+.mtab.active { color: var(--TE); border-bottom-color: var(--TE); }
 
-  header span {
-    font-size: 0.75rem;
-    color: var(--dim);
-    font-family: 'IBM Plex Mono', monospace;
-  }
+/* ── Layout ── */
+.main { display: grid; grid-template-columns: 320px 1fr; gap: 0; height: calc(100vh - 90px); overflow: hidden; }
+@media(max-width:800px){ .main { grid-template-columns:1fr; height:auto; overflow:visible; } }
 
-  .tabs {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    padding: 0 32px;
-    overflow-x: auto;
-  }
+.sidebar {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
 
-  .tab {
-    padding: 10px 20px;
-    font-size: 0.78rem;
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--dim);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--causal); border-bottom-color: var(--causal); }
+.canvas-panel {
+  overflow-y: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
 
-  .scene { display: none; padding: 24px 32px; }
-  .scene.active { display: block; }
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+}
+.card-title {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.68rem; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
 
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    align-items: start;
-  }
+/* ── Sliders ── */
+.srow {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.slabel {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.68rem; color: var(--dim);
+  width: 130px; flex-shrink: 0; line-height: 1.3;
+}
+input[type=range] {
+  flex: 1; -webkit-appearance: none;
+  height: 2px; background: var(--border2);
+  border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--TE); cursor: pointer;
+  transition: background 0.15s;
+}
+input[type=range]:hover::-webkit-slider-thumb { background: var(--bright); }
+.sval {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.68rem; color: var(--bright);
+  width: 42px; text-align: right;
+}
 
-  @media(max-width:700px){ .two-col { grid-template-columns:1fr; } }
+/* ── Result box ── */
+.result {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.73rem;
+  line-height: 1.9;
+}
+.result .rlab { color: var(--dim); }
+.r-NDE { color: var(--NDE); font-weight: 600; }
+.r-NIE { color: var(--NIE); font-weight: 600; }
+.r-TE  { color: var(--TE);  font-weight: 600; }
+.r-int { color: var(--int); font-weight: 600; }
+.r-warn{ color: var(--warn);font-weight: 600; }
+.r-ok  { color: var(--NIE); font-weight: 600; }
 
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 20px;
-  }
+/* ── Formula block ── */
+.formula {
+  background: #0d1117;
+  border-left: 3px solid var(--border2);
+  padding: 8px 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem; color: var(--bright);
+  border-radius: 0 4px 4px 0;
+  margin: 8px 0; line-height: 1.7;
+}
+.formula.nde { border-left-color: var(--NDE); }
+.formula.nie { border-left-color: var(--NIE); }
+.formula.te  { border-left-color: var(--TE); }
+.formula.int { border-left-color: var(--int); }
 
-  .card h3 {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--causal);
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
+/* ── Badge ── */
+.badge {
+  display: inline-block; padding: 1px 7px; border-radius: 3px;
+  font-family: 'Fira Code', monospace; font-size: 0.62rem; font-weight: 600;
+  margin-left: 4px; vertical-align: middle;
+}
+.b-NDE { background:#0d2440; color:var(--NDE); }
+.b-NIE { background:#0d2a14; color:var(--NIE); }
+.b-TE  { background:#2d1a08; color:var(--TE);  }
+.b-int { background:#1e1040; color:var(--int); }
+.b-warn{ background:#2d0c0c; color:var(--warn);}
 
-  .card p, .card li {
-    font-size: 0.82rem;
-    color: var(--dim);
-    line-height: 1.6;
-    margin-bottom: 6px;
-  }
+canvas { display: block; width: 100%; background: #0d1117; border-radius: 4px; }
 
-  canvas {
-    display: block;
-    width: 100%;
-    border-radius: 4px;
-    background: #080c11;
-  }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:600px){ .row2 { grid-template-columns:1fr; } }
 
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-top: 16px;
-  }
+select {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border2); border-radius: 4px;
+  padding: 5px 10px;
+  font-family: 'Fira Code', monospace; font-size: 0.72rem;
+  cursor: pointer; outline: none;
+}
 
-  .slider-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+.annot {
+  font-size: 0.78rem; color: var(--dim);
+  font-family: 'Crimson Pro', Georgia, serif;
+  line-height: 1.55; margin-top: 4px;
+}
 
-  .slider-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--dim);
-    width: 140px;
-    flex-shrink: 0;
-  }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pill {
+  padding: 4px 12px; border-radius: 20px;
+  font-family: 'Fira Code', monospace; font-size: 0.65rem;
+  border: 1px solid var(--border2); color: var(--dim);
+  cursor: pointer; transition: all 0.15s;
+}
+.pill:hover { border-color: var(--TE); color: var(--TE); }
+.pill.on { border-color: var(--TE); color: var(--TE); background: #2d1a0822; }
 
-  input[type=range] {
-    flex: 1;
-    -webkit-appearance: none;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--causal);
-    cursor: pointer;
-  }
+.sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
-  .val-display {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--bright);
-    width: 40px;
-    text-align: right;
-  }
-
-  .result-box {
-    background: #080c11;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px 16px;
-    margin-top: 14px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.78rem;
-    line-height: 1.8;
-  }
-
-  .result-box .label { color: var(--dim); }
-  .result-box .val-obs { color: var(--obs); font-weight: 600; }
-  .result-box .val-do { color: var(--causal); font-weight: 600; }
-  .result-box .val-diff { color: var(--confound); font-weight: 600; }
-  .result-box .val-ok { color: var(--mediator); font-weight: 600; }
-
-  button.btn {
-    padding: 8px 18px;
-    background: transparent;
-    border: 1px solid var(--causal);
-    color: var(--causal);
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.75rem;
-    transition: all 0.15s;
-  }
-  button.btn:hover { background: var(--causal); color: #000; }
-  button.btn.active { background: var(--causal); color: #000; }
-
-  .dot-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-top: 10px;
-  }
-  .dot-legend span {
-    font-size: 0.72rem;
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--dim);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .dot-legend .dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-  }
-
-  .formula {
-    background: #080c11;
-    border-left: 3px solid var(--causal);
-    padding: 10px 14px;
-    border-radius: 0 4px 4px 0;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.8rem;
-    color: var(--bright);
-    margin: 10px 0;
-  }
-
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.68rem;
-    font-weight: 600;
-    margin-left: 6px;
-  }
-  .badge-obs { background: #1e3a5f; color: var(--obs); }
-  .badge-causal { background: #422006; color: var(--causal); }
-  .badge-bad { background: #3b1515; color: var(--confound); }
-
-  table.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    margin-top: 10px;
-  }
-  table.data-table th {
-    color: var(--dim);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 8px;
-    text-align: left;
-  }
-  table.data-table td {
-    padding: 5px 8px;
-    color: var(--text);
-    border-bottom: 1px solid #151e2b;
-  }
-  table.data-table tr:hover td { background: #12192b; }
-
+/* interaction warning banner */
+.banner {
+  padding: 8px 14px; border-radius: 4px;
+  font-family: 'Fira Code', monospace; font-size: 0.7rem;
+  display: none; margin-top: 8px; line-height: 1.6;
+}
+.banner.active { display: block; }
+.banner.warn { background:#2d0c0c; border:1px solid var(--warn); color:var(--warn); }
+.banner.ok   { background:#0d2a14; border:1px solid var(--NIE);  color:var(--NIE); }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Pearl's Structural Causal Model</h1>
-  <span>Interactive Simulation — R-350 (2009)</span>
-</header>
-
-<div class="tabs">
-  <div class="tab active" onclick="switchTab(0)">1 · Association vs Causation</div>
-  <div class="tab" onclick="switchTab(1)">2 · Confounding & Backdoor</div>
-  <div class="tab" onclick="switchTab(2)">3 · do-Calculus</div>
-  <div class="tab" onclick="switchTab(3)">4 · Mediation</div>
-  <div class="tab" onclick="switchTab(4)">5 · Counterfactuals</div>
+<div class="header">
+  <h1>Pearl Mediation · Full Nonlinear</h1>
+  <span class="sub">NDE / NIE via Monte-Carlo counterfactual simulation · SCM-R350</span>
 </div>
 
-<!-- SCENE 0: Association vs Causation -->
-<div class="scene active" id="scene0">
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>The Ladder of Causation</h3>
-        <p>Pearl's key insight: <em>correlation ≠ causation</em> is not just a warning — it's a formal distinction. Three distinct questions require three different mathematical tools.</p>
-        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
-          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--obs);">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--obs);margin-bottom:4px;">RUNG 1 · ASSOCIATION</div>
-            <div style="font-size:0.78rem;color:var(--dim);">P(Y | X=x) — seeing, observing. "What does observing X tell me about Y?"</div>
-          </div>
-          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--causal);">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--causal);margin-bottom:4px;">RUNG 2 · INTERVENTION</div>
-            <div style="font-size:0.78rem;color:var(--dim);">P(Y | do(X=x)) — doing. "What happens to Y if I <em>set</em> X to x?"</div>
-          </div>
-          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--mediator);">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--mediator);margin-bottom:4px;">RUNG 3 · COUNTERFACTUAL</div>
-            <div style="font-size:0.78rem;color:var(--dim);">P(Yₓ=y' | X=x, Y=y) — imagining. "Would Y have been different had X been x'?"</div>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>Simulate: Ice Cream & Drowning</h3>
-        <p style="margin-bottom:10px;">Classic spurious correlation. Both are driven by hidden <em>Season</em>. Adjust the confounder strength.</p>
-        <div class="controls">
-          <div class="slider-row">
-            <span class="slider-label">Season → Ice cream</span>
-            <input type="range" id="s0_a" min="0" max="2" step="0.1" value="1.2" oninput="sim0()">
-            <span class="val-display" id="s0_a_v">1.2</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">Season → Drowning</span>
-            <input type="range" id="s0_b" min="0" max="2" step="0.1" value="1.0" oninput="sim0()">
-            <span class="val-display" id="s0_b_v">1.0</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">Direct Ice→Drowning</span>
-            <input type="range" id="s0_c" min="-0.5" max="0.5" step="0.05" value="0" oninput="sim0()">
-            <span class="val-display" id="s0_c_v">0.00</span>
-          </div>
-        </div>
-        <div class="result-box" id="res0">
-          Calculating…
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <h3>Scatter: Ice Cream Sales vs Drownings</h3>
-        <canvas id="c0" height="280"></canvas>
-        <div class="dot-legend" style="margin-top:8px;">
-          <span><span class="dot" style="background:var(--obs)"></span> Summer</span>
-          <span><span class="dot" style="background:var(--causal)"></span> Winter</span>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>What changes with do(Ice=high)?</h3>
-        <p>When we <em>intervene</em> (do-calculus), we sever the arrow Season→IceCream. The spurious correlation disappears.</p>
-        <canvas id="c0b" height="220"></canvas>
-      </div>
-    </div>
-  </div>
+<div class="model-strip">
+  <div class="mtab active"  onclick="setModel(0)">Linear</div>
+  <div class="mtab"         onclick="setModel(1)">Logistic M, Linear Y</div>
+  <div class="mtab"         onclick="setModel(2)">Binary Y (logistic)</div>
+  <div class="mtab"         onclick="setModel(3)">X×M Interaction</div>
+  <div class="mtab"         onclick="setModel(4)">Threshold / Nonmonotone</div>
 </div>
 
-<!-- SCENE 1: Confounding & Backdoor -->
-<div class="scene" id="scene1">
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>Backdoor Criterion</h3>
-        <p>A set S blocks all <em>backdoor paths</em> from X to Y (paths with arrow pointing into X). Once blocked, the naive regression <em>equals</em> the causal effect.</p>
-        <div class="formula">P(Y|do(X)) = Σ_s P(Y|X,S=s)·P(S=s)</div>
-        <p style="margin-top:8px;">Below: Treatment X → Outcome Y, but both share confounder Z (e.g. socioeconomic status). Toggle whether you adjust for Z.</p>
-        <div class="controls" style="margin-top:14px;">
-          <div class="slider-row">
-            <span class="slider-label">Z → X (conf. strength)</span>
-            <input type="range" id="s1_zx" min="0" max="1.5" step="0.1" value="1.0" oninput="sim1()">
-            <span class="val-display" id="s1_zx_v">1.0</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">Z → Y (conf. strength)</span>
-            <input type="range" id="s1_zy" min="0" max="1.5" step="0.1" value="0.8" oninput="sim1()">
-            <span class="val-display" id="s1_zy_v">0.8</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">True X → Y effect</span>
-            <input type="range" id="s1_xy" min="-1" max="2" step="0.1" value="0.5" oninput="sim1()">
-            <span class="val-display" id="s1_xy_v">0.5</span>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:4px;">
-            <button class="btn active" id="btn_unadj" onclick="setAdj(false)">Unadjusted</button>
-            <button class="btn" id="btn_adj" onclick="setAdj(true)">Adjust for Z</button>
-          </div>
-        </div>
-        <div class="result-box" id="res1">Calculating…</div>
-      </div>
+<div class="main">
+
+<!-- ── SIDEBAR ── -->
+<div class="sidebar">
+
+  <div class="card">
+    <div class="card-title">Structural Equations</div>
+    <div id="scm_display" class="formula">Loading…</div>
+    <p class="annot" id="model_annot"></p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Parameters</div>
+
+    <div class="srow">
+      <span class="slabel">X value (x)</span>
+      <input type="range" id="p_x1" min="0" max="1" step="0.05" value="1" oninput="go()">
+      <span class="sval" id="v_x1">1.00</span>
     </div>
-    <div>
-      <div class="card">
-        <h3>DAG: X ← Z → Y, X → Y</h3>
-        <canvas id="c1dag" height="160"></canvas>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>Regression line: naive vs adjusted</h3>
-        <canvas id="c1" height="260"></canvas>
-        <div class="dot-legend">
-          <span><span class="dot" style="background:var(--confound)"></span>Z low</span>
-          <span><span class="dot" style="background:var(--mediator)"></span>Z high</span>
-        </div>
-      </div>
+    <div class="srow">
+      <span class="slabel">X baseline (x')</span>
+      <input type="range" id="p_x0" min="0" max="1" step="0.05" value="0" oninput="go()">
+      <span class="sval" id="v_x0">0.00</span>
+    </div>
+
+    <hr class="sep">
+
+    <div class="srow">
+      <span class="slabel">α  X → Y direct</span>
+      <input type="range" id="p_a" min="-2" max="2" step="0.1" value="0.5" oninput="go()">
+      <span class="sval" id="v_a">0.5</span>
+    </div>
+    <div class="srow">
+      <span class="slabel">γ  X → M</span>
+      <input type="range" id="p_g" min="-2" max="2" step="0.1" value="1.0" oninput="go()">
+      <span class="sval" id="v_g">1.0</span>
+    </div>
+    <div class="srow">
+      <span class="slabel">δ  M → Y</span>
+      <input type="range" id="p_d" min="-2" max="2" step="0.1" value="1.0" oninput="go()">
+      <span class="sval" id="v_d">1.0</span>
+    </div>
+    <div class="srow" id="row_int">
+      <span class="slabel">θ  X×M interact</span>
+      <input type="range" id="p_t" min="-2" max="2" step="0.1" value="0.0" oninput="go()">
+      <span class="sval" id="v_t">0.0</span>
+    </div>
+    <div class="srow" id="row_nl">
+      <span class="slabel">κ  nonlinearity</span>
+      <input type="range" id="p_k" min="-2" max="2" step="0.1" value="0.0" oninput="go()">
+      <span class="sval" id="v_k">0.0</span>
+    </div>
+
+    <hr class="sep">
+
+    <div class="srow">
+      <span class="slabel">σ noise</span>
+      <input type="range" id="p_s" min="0.05" max="1.5" step="0.05" value="0.4" oninput="go()">
+      <span class="sval" id="v_s">0.40</span>
+    </div>
+    <div class="srow">
+      <span class="slabel">N Monte-Carlo</span>
+      <input type="range" id="p_n" min="500" max="5000" step="500" value="2000" oninput="go()">
+      <span class="sval" id="v_n">2000</span>
     </div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Quick scenarios</div>
+    <div class="pill-row">
+      <span class="pill" onclick="preset('full_mediation')">Full mediation</span>
+      <span class="pill" onclick="preset('partial')">Partial</span>
+      <span class="pill" onclick="preset('inconsistent')">Inconsistent</span>
+      <span class="pill" onclick="preset('suppression')">Suppression</span>
+      <span class="pill" onclick="preset('no_mediation')">No mediation</span>
+      <span class="pill" onclick="preset('interact_pos')">Interaction+</span>
+      <span class="pill" onclick="preset('interact_neg')">Interaction−</span>
+    </div>
+  </div>
+
+  <div class="result" id="result_box">Calculating…</div>
+
+  <div class="banner" id="banner_inconsist"></div>
 </div>
 
-<!-- SCENE 2: do-calculus -->
-<div class="scene" id="scene2">
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>Intervention vs Observation</h3>
-        <p>Drug trial with partial compliance. Z = assigned treatment, X = treatment actually taken, Y = outcome. UX,UY are correlated (confounded).</p>
-        <div class="formula">P(Y|X=1) ≠ P(Y|do(X=1))</div>
-        <p style="margin-top:8px;">The difference is confounding bias. With randomized Z as instrument, we can recover the true causal effect via IV estimator.</p>
-        <div class="controls" style="margin-top:14px;">
-          <div class="slider-row">
-            <span class="slider-label">True drug effect β</span>
-            <input type="range" id="s2_b" min="-1" max="2" step="0.1" value="1.0" oninput="sim2()">
-            <span class="val-display" id="s2_b_v">1.0</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">Compliance rate</span>
-            <input type="range" id="s2_comp" min="0.1" max="1" step="0.05" value="0.7" oninput="sim2()">
-            <span class="val-display" id="s2_comp_v">0.70</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">UX–UY correlation</span>
-            <input type="range" id="s2_rho" min="-0.9" max="0.9" step="0.1" value="0.7" oninput="sim2()">
-            <span class="val-display" id="s2_rho_v">0.7</span>
-          </div>
-        </div>
-        <div class="result-box" id="res2">Calculating…</div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <h3>Clinical Trial DAG</h3>
-        <canvas id="c2dag" height="160"></canvas>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>Bias as function of confounding ρ</h3>
-        <canvas id="c2" height="250"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- ── CANVAS PANEL ── -->
+<div class="canvas-panel">
 
-<!-- SCENE 3: Mediation -->
-<div class="scene" id="scene3">
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>Direct vs Indirect Effects</h3>
-        <p>X → Y (direct) and X → M → Y (via mediator M). Pearl's mediation formula decomposes total effect into direct + indirect.</p>
-        <div class="formula">TE = DE + IE (linear case)</div>
-        <div class="formula" style="border-left-color:var(--mediator)">IE = Σ_m E[Y|x,m]·[P(m|x')−P(m|x)]</div>
-        <p style="margin-top:8px;">Example: Gender → Qualification → Hiring, plus Gender → Hiring directly (discrimination).</p>
-        <div class="controls" style="margin-top:14px;">
-          <div class="slider-row">
-            <span class="slider-label">X → Y direct (α)</span>
-            <input type="range" id="s3_dir" min="-1" max="2" step="0.1" value="0.3" oninput="sim3()">
-            <span class="val-display" id="s3_dir_v">0.3</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">X → M (γ)</span>
-            <input type="range" id="s3_xm" min="-1" max="2" step="0.1" value="0.8" oninput="sim3()">
-            <span class="val-display" id="s3_xm_v">0.8</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">M → Y (δ)</span>
-            <input type="range" id="s3_my" min="-1" max="2" step="0.1" value="0.9" oninput="sim3()">
-            <span class="val-display" id="s3_my_v">0.9</span>
-          </div>
-        </div>
-        <div class="result-box" id="res3">Calculating…</div>
-      </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">DAG</div>
+      <canvas id="c_dag" height="150"></canvas>
     </div>
-    <div>
-      <div class="card">
-        <h3>Mediation DAG</h3>
-        <canvas id="c3dag" height="160"></canvas>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>Effect decomposition bar</h3>
-        <canvas id="c3bar" height="240"></canvas>
-      </div>
+    <div class="card">
+      <div class="card-title">Effect decomposition</div>
+      <canvas id="c_bar" height="150"></canvas>
     </div>
   </div>
-</div>
 
-<!-- SCENE 4: Counterfactuals -->
-<div class="scene" id="scene4">
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <h3>Probability of Necessity (PN)</h3>
-        <p>Given a patient <em>took the drug and recovered</em>, what's the probability they would have died <em>without</em> it? This is PN — a Rung 3 (counterfactual) query.</p>
-        <div class="formula">PN = P(Yx'=0 | X=x, Y=1)</div>
-        <p style="margin-top:8px;">With monotonicity assumption (drug can only help), Pearl shows:</p>
-        <div class="formula" style="font-size:0.72rem">PN ≥ (RR − 1)/RR where RR = P(Y=1|X=1)/P(Y=1|X=0)</div>
-        <div class="controls" style="margin-top:14px;">
-          <div class="slider-row">
-            <span class="slider-label">P(recover | treated)</span>
-            <input type="range" id="s4_pt" min="0.01" max="0.99" step="0.01" value="0.75" oninput="sim4()">
-            <span class="val-display" id="s4_pt_v">0.75</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">P(recover | control)</span>
-            <input type="range" id="s4_pc" min="0.01" max="0.99" step="0.01" value="0.40" oninput="sim4()">
-            <span class="val-display" id="s4_pc_v">0.40</span>
-          </div>
-          <div class="slider-row">
-            <span class="slider-label">Confounding bias</span>
-            <input type="range" id="s4_bias" min="-0.3" max="0.3" step="0.01" value="0.0" oninput="sim4()">
-            <span class="val-display" id="s4_bias_v">0.00</span>
-          </div>
-        </div>
-        <div class="result-box" id="res4">Calculating…</div>
-      </div>
+  <div class="card">
+    <div class="card-title">E[Y | x, m] surface — how the structural equation looks</div>
+    <canvas id="c_surface" height="200"></canvas>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">M distribution: P(M | x) vs P(M | x')</div>
+      <canvas id="c_mdist" height="180"></canvas>
     </div>
-    <div>
-      <div class="card">
-        <h3>Individual Response Types</h3>
-        <p style="margin-bottom:10px;font-size:0.78rem;">Four possible response types for a binary treatment/outcome. Counterfactual analysis constrains their proportions.</p>
-        <canvas id="c4pie" height="200"></canvas>
-        <div class="dot-legend" style="margin-top:10px;">
-          <span><span class="dot" style="background:#10b981"></span>Always recover</span>
-          <span><span class="dot" style="background:var(--causal)"></span>Helped by drug</span>
-          <span><span class="dot" style="background:var(--confound)"></span>Hurt by drug</span>
-          <span><span class="dot" style="background:var(--dim)"></span>Never recover</span>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3>PN bounds as function of RR</h3>
-        <canvas id="c4rr" height="200"></canvas>
-      </div>
+    <div class="card">
+      <div class="card-title">NDE / NIE as α varies (all else fixed)</div>
+      <canvas id="c_sweep" height="180"></canvas>
     </div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Counterfactual intuition: individual-level Y(x, M(x')) vs Y(x, M(x))</div>
+    <canvas id="c_cf" height="180"></canvas>
+  </div>
+
+</div>
 </div>
 
 <script>
-// ────────────────────────────────────────────────
-// UTILITIES
-// ────────────────────────────────────────────────
+'use strict';
+
+// ── RNG ──────────────────────────────────────────
 function randn() {
-  let u=0,v=0;
-  while(u===0)u=Math.random();
-  while(v===0)v=Math.random();
+  let u,v;
+  do { u=Math.random(); } while(u===0);
+  do { v=Math.random(); } while(v===0);
   return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
 }
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+function logit(p)  { return Math.log(p/(1-p)); }
 
-function linreg(xs,ys){
-  const n=xs.length;
-  let mx=0,my=0;
-  for(let i=0;i<n;i++){mx+=xs[i];my+=ys[i];}
-  mx/=n;my/=n;
-  let num=0,den=0;
-  for(let i=0;i<n;i++){num+=(xs[i]-mx)*(ys[i]-my);den+=(xs[i]-mx)**2;}
-  const b=den===0?0:num/den;
-  const a=my-b*mx;
-  return {a,b};
+// ── Model registry ───────────────────────────────
+// Each model defines:
+//   scm(params)  → {text, annot}
+//   sampleM(x, params) → scalar m
+//   sampleY(x, m, params) → scalar y
+//   E_Y(x, m, params) → E[Y|x,m] (for surface)
+
+const MODELS = [
+
+  // 0 — Linear
+  {
+    label: 'Linear',
+    scm(p){ return {
+      text: `M = γ·X + ε_M\nY = α·X + δ·M + ε_Y`,
+      annot: 'Linear SCM. NDE = α(x−x′), NIE = γδ(x−x′). NDE+NIE = TE always.'
+    }},
+    sampleM(x,p){ return p.g*x + p.s*randn(); },
+    sampleY(x,m,p){ return p.a*x + p.d*m + p.s*randn(); },
+    E_Y(x,m,p){ return p.a*x + p.d*m; },
+  },
+
+  // 1 — Logistic M, linear Y
+  {
+    label: 'Logistic M',
+    scm(p){ return {
+      text: `M ~ Bernoulli(σ(γ·X))\nY = α·X + δ·M + ε_Y`,
+      annot: 'Binary mediator (e.g. surgery performed). Nonlinearity in M→distribution. Linear additive Y.'
+    }},
+    sampleM(x,p){ return Math.random()<sigmoid(p.g*x)?1:0; },
+    sampleY(x,m,p){ return p.a*x + p.d*m + p.s*randn(); },
+    E_Y(x,m,p){ return p.a*x + p.d*m; },
+  },
+
+  // 2 — Binary Y (logistic)
+  {
+    label: 'Binary Y',
+    scm(p){ return {
+      text: `M = γ·X + ε_M\nY ~ Bernoulli(σ(α·X + δ·M))`,
+      annot: 'Binary outcome (alive/dead). NDE≠α·Δx in general — must integrate over M distribution.'
+    }},
+    sampleM(x,p){ return p.g*x + p.s*randn(); },
+    sampleY(x,m,p){ return Math.random()<sigmoid(p.a*x+p.d*m)?1:0; },
+    E_Y(x,m,p){ return sigmoid(p.a*x+p.d*m); },
+  },
+
+  // 3 — Interaction X*M
+  {
+    label: 'X×M Interaction',
+    scm(p){ return {
+      text: `M = γ·X + ε_M\nY = α·X + δ·M + θ·X·M + ε_Y`,
+      annot: 'Interaction θ makes NDE and NIE depend on the level of x. The linear identity NDE+NIE=TE still holds, but both terms change with (x,x′).'
+    }},
+    sampleM(x,p){ return p.g*x + p.s*randn(); },
+    sampleY(x,m,p){ return p.a*x + p.d*m + p.t*x*m + p.s*randn(); },
+    E_Y(x,m,p){ return p.a*x + p.d*m + p.t*x*m; },
+  },
+
+  // 4 — Threshold / nonmonotone
+  {
+    label: 'Threshold',
+    scm(p){ return {
+      text: `M = γ·X + ε_M\nY = α·X + δ·tanh(κ·M) + ε_Y`,
+      annot: 'Saturating/threshold mediator response via tanh. κ controls curvature. NIE is no longer γδ·Δx — must integrate E[Y|x,m] over P(M|x).'
+    }},
+    sampleM(x,p){ return p.g*x + p.s*randn(); },
+    sampleY(x,m,p){ return p.a*x + p.d*Math.tanh(p.k*m) + p.s*randn(); },
+    E_Y(x,m,p){ return p.a*x + p.d*Math.tanh(p.k*m); },
+  },
+];
+
+// ── State ────────────────────────────────────────
+let MODEL = 0;
+
+function getP(){
+  const g = id => +document.getElementById(id).value;
+  return {
+    x1: g('p_x1'), x0: g('p_x0'),
+    a:  g('p_a'),  g:  g('p_g'),
+    d:  g('p_d'),  t:  g('p_t'),
+    k:  g('p_k'),  s:  g('p_s'),
+    N:  g('p_n'),
+  };
 }
 
-function corr(xs,ys){
-  const n=xs.length;
-  let mx=0,my=0;
-  for(let i=0;i<n;i++){mx+=xs[i];my+=ys[i];}
-  mx/=n;my/=n;
-  let num=0,dx2=0,dy2=0;
-  for(let i=0;i<n;i++){
-    const dx=xs[i]-mx,dy=ys[i]-my;
-    num+=dx*dy;dx2+=dx*dx;dy2+=dy*dy;
+function sv(id, vId, fmt){
+  const v = +document.getElementById(id).value;
+  document.getElementById(vId).textContent = v.toFixed(fmt??2);
+}
+
+// ── Monte-Carlo NDE/NIE ──────────────────────────
+// Pearl's definitions (binary X for clarity, but works for continuous):
+//   NDE(x,x') = E[Y(x, M(x'))] − E[Y(x', M(x'))]
+//   NIE(x,x') = E[Y(x, M(x))]  − E[Y(x, M(x'))]
+//   TE         = NDE + NIE
+//
+// Algorithm: for each unit i,
+//   draw M0 ~ P(M|X=x'), M1 ~ P(M|X=x)
+//   compute Y(x,M0), Y(x',M0), Y(x,M1)
+//   NDE_i = E[Y(x,M0)] − E[Y(x',M0)]
+//   NIE_i = E[Y(x,M1)] − E[Y(x,M0)]
+
+function mcMediation(model, p){
+  const N = p.N;
+  const {x1, x0} = p;
+  let sumNDE=0, sumNIE=0, sumTE=0;
+  let sumNDE2=0, sumNIE2=0;
+
+  for(let i=0;i<N;i++){
+    const m0 = model.sampleM(x0, p);  // M under x'
+    const m1 = model.sampleM(x1, p);  // M under x
+
+    const y_x1_m0 = model.E_Y(x1, m0, p); // Y(x,  M(x'))
+    const y_x0_m0 = model.E_Y(x0, m0, p); // Y(x', M(x'))
+    const y_x1_m1 = model.E_Y(x1, m1, p); // Y(x,  M(x))
+
+    const nde_i = y_x1_m0 - y_x0_m0;
+    const nie_i = y_x1_m1 - y_x1_m0;
+
+    sumNDE += nde_i; sumNDE2 += nde_i*nde_i;
+    sumNIE += nie_i; sumNIE2 += nie_i*nie_i;
+    sumTE  += nde_i + nie_i;
   }
-  return num/Math.sqrt(dx2*dy2);
+
+  const NDE = sumNDE/N;
+  const NIE = sumNIE/N;
+  const TE  = sumTE/N;
+
+  // SE (delta method approximation via sample variance)
+  const se_NDE = Math.sqrt((sumNDE2/N - NDE*NDE)/N);
+  const se_NIE = Math.sqrt((sumNIE2/N - NIE*NIE)/N);
+
+  return {NDE, NIE, TE, se_NDE, se_NIE};
 }
 
-function setupCanvas(id,h){
-  const canvas=document.getElementById(id);
-  const dpr=window.devicePixelRatio||1;
-  const rect=canvas.parentElement.getBoundingClientRect();
-  const w=rect.width-40;
-  canvas.style.width=w+'px';
-  canvas.style.height=h+'px';
-  canvas.width=w*dpr;
-  canvas.height=h*dpr;
-  const ctx=canvas.getContext('2d');
+// ── Sweep over α for the line chart ─────────────
+function sweepAlpha(model, p){
+  const alphas = [];
+  const ndes = [], nies = [], tes = [];
+  for(let a=-2; a<=2; a+=0.2){
+    const pp = {...p, a, N:500};
+    const r = mcMediation(model, pp);
+    alphas.push(a); ndes.push(r.NDE); nies.push(r.NIE); tes.push(r.TE);
+  }
+  return {alphas, ndes, nies, tes};
+}
+
+// ── Presets ──────────────────────────────────────
+const PRESETS = {
+  full_mediation:  {a:0.0, g:1.2, d:1.2, t:0, k:0, model:0},
+  partial:         {a:0.5, g:1.0, d:1.0, t:0, k:0, model:0},
+  inconsistent:    {a:1.5, g:1.0, d:-1.5,t:0, k:0, model:0},
+  suppression:     {a:1.5, g:1.0, d:-1.2,t:0, k:0, model:0},
+  no_mediation:    {a:0.8, g:0.0, d:1.0, t:0, k:0, model:0},
+  interact_pos:    {a:0.2, g:0.8, d:0.5, t:1.2, k:0, model:3},
+  interact_neg:    {a:0.8, g:0.8, d:1.0, t:-1.5,k:0, model:3},
+};
+
+function preset(name){
+  const q = PRESETS[name];
+  setModel(q.model);
+  const set = (id,v,fmt)=>{
+    document.getElementById(id).value=v;
+    const vid=id.replace('p_','v_');
+    if(document.getElementById(vid)) document.getElementById(vid).textContent=v.toFixed(fmt??1);
+  };
+  set('p_a', q.a); set('p_g', q.g); set('p_d', q.d);
+  set('p_t', q.t); set('p_k', q.k);
+  go();
+}
+
+// ── Canvas helpers ───────────────────────────────
+function getCtx(id, h){
+  const canvas = document.getElementById(id);
+  const dpr = window.devicePixelRatio||1;
+  const w2 = canvas.parentElement.clientWidth - 32;
+  canvas.style.width  = w2+'px';
+  canvas.style.height = h+'px';
+  canvas.width  = w2*dpr;
+  canvas.height = h*dpr;
+  const ctx = canvas.getContext('2d');
   ctx.scale(dpr,dpr);
-  return {ctx,w,h};
+  return {ctx, w:w2, h};
 }
 
-// ────────────────────────────────────────────────
-// SCENE 0: Spurious Correlation
-// ────────────────────────────────────────────────
-let scene0data=[];
-function sim0(){
-  const a=+document.getElementById('s0_a').value;
-  const b=+document.getElementById('s0_b').value;
-  const c=+document.getElementById('s0_c').value;
-  document.getElementById('s0_a_v').textContent=a.toFixed(1);
-  document.getElementById('s0_b_v').textContent=b.toFixed(1);
-  document.getElementById('s0_c_v').textContent=c.toFixed(2);
-
-  const N=200;
-  scene0data=[];
-  for(let i=0;i<N;i++){
-    const season=(i<N/2)?1:-1; // summer=1, winter=-1
-    const ice=a*season+0.3*randn();
-    const drown=b*season+c*ice+0.3*randn();
-    scene0data.push({ice,drown,summer:season>0});
-  }
-  drawScatter0();
-  const xs=scene0data.map(d=>d.ice);
-  const ys=scene0data.map(d=>d.drown);
-  const r=corr(xs,ys).toFixed(3);
-  const lr=linreg(xs,ys);
-
-  // Simulated do: remove season->ice link, keep c only
-  const N2=200;
-  let biasArr=[];
-  for(let i=0;i<N2;i++){
-    const season=(Math.random()<0.5)?1:-1;
-    const ice_obs=a*season+0.3*randn();
-    const ice_do=randn()*0.3; // do: set ice randomly, season no longer drives it
-    const y_obs=b*season+c*ice_obs+0.3*randn();
-    const y_do=b*season+c*ice_do+0.3*randn();
-    biasArr.push({obs_slope:lr.b, do_slope:c});
-  }
-
-  document.getElementById('res0').innerHTML=
-    `<span class="label">Observed corr(Ice,Drown): </span><span class="val-obs">${r}</span><br>`+
-    `<span class="label">Obs. regression slope:    </span><span class="val-obs">${lr.b.toFixed(3)}</span> <span class="badge badge-obs">P(Y|X)</span><br>`+
-    `<span class="label">True causal slope (β):    </span><span class="val-do">${c.toFixed(3)}</span> <span class="badge badge-causal">P(Y|do(X))</span><br>`+
-    `<span class="label">Confounding bias:         </span><span class="val-diff">${(lr.b-c).toFixed(3)}</span><br>`+
-    `<span class="label">Conclusion:               </span><span class="${Math.abs(lr.b-c)<0.05?'val-ok':'val-diff'}">${Math.abs(lr.b-c)<0.05?'No confounding':'Spurious!'}</span>`;
-
-  drawDoScatter0(a,b,c);
+function axes(ctx, w, h, pad, xl, yl, col='#21262d'){
+  ctx.strokeStyle=col; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, h-pad.b);
+  ctx.lineTo(w-pad.r, h-pad.b);
+  ctx.stroke();
+  ctx.fillStyle='#8b949e'; ctx.font='10px Fira Code';
+  ctx.textAlign='center';
+  ctx.fillText(xl, pad.l+(w-pad.l-pad.r)/2, h-4);
+  ctx.save(); ctx.translate(11, pad.t+(h-pad.t-pad.b)/2);
+  ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.fillText(yl,0,0); ctx.restore();
 }
 
-function drawScatter0(){
-  const {ctx,w,h}=setupCanvas('c0',280);
+function arrow(ctx, from, to, col, lw=2){
+  const dx=to[0]-from[0], dy=to[1]-from[1];
+  const len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1) return;
+  const ux=dx/len, uy=dy/len;
+  ctx.strokeStyle=col; ctx.lineWidth=lw;
+  ctx.beginPath(); ctx.moveTo(from[0],from[1]); ctx.lineTo(to[0],to[1]); ctx.stroke();
+  ctx.fillStyle=col;
+  const angle=Math.atan2(dy,dx);
+  ctx.beginPath();
+  ctx.moveTo(to[0],to[1]);
+  ctx.lineTo(to[0]-9*Math.cos(angle-0.4), to[1]-9*Math.sin(angle-0.4));
+  ctx.lineTo(to[0]-9*Math.cos(angle+0.4), to[1]-9*Math.sin(angle+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+// ── Draw DAG ─────────────────────────────────────
+function drawDAG(p){
+  const {ctx,w,h} = getCtx('c_dag',150);
   ctx.clearRect(0,0,w,h);
-  const xs=scene0data.map(d=>d.ice);
-  const ys=scene0data.map(d=>d.drown);
-  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
-  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
-  const px=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
-  const py=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
+  const X=[w*0.12,h*0.62], M=[w*0.5,h*0.15], Y=[w*0.88,h*0.62];
+  const r=22;
 
-  // axes
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('Ice Cream Sales',w/2-40,h-8);
-  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('Drownings',0,0);ctx.restore();
+  // shrink endpoints to circle boundary
+  function tip(from, to){
+    const dx=to[0]-from[0], dy=to[1]-from[1];
+    const l=Math.sqrt(dx*dx+dy*dy);
+    return [from[0]+dx/l*r, from[1]+dy/l*r];
+  }
+  function tail(from, to){
+    const dx=to[0]-from[0], dy=to[1]-from[1];
+    const l=Math.sqrt(dx*dx+dy*dy);
+    return [to[0]-dx/l*r, to[1]-dy/l*r];
+  }
 
-  scene0data.forEach(d=>{
+  // X→M γ
+  arrow(ctx, tip(X,M), tail(X,M), '#3fb950');
+  // M→Y δ
+  arrow(ctx, tip(M,Y), tail(M,Y), '#3fb950');
+  // X→Y α
+  arrow(ctx, tip(X,Y), tail(X,Y), '#58a6ff');
+
+  // Interaction X→Y (curved) if θ≠0
+  if(Math.abs(p.t)>0.05){
+    ctx.strokeStyle='#bc8cff'; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
     ctx.beginPath();
-    ctx.arc(px(d.ice),py(d.drown),3.5,0,Math.PI*2);
-    ctx.fillStyle=d.summer?'rgba(59,130,246,0.7)':'rgba(245,158,11,0.7)';
-    ctx.fill();
+    ctx.moveTo(tip(X,M)[0],tip(X,M)[1]);
+    ctx.bezierCurveTo(w*0.5, h*0.8, w*0.7, h*0.8, tail(X,Y)[0], tail(X,Y)[1]);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#bc8cff'; ctx.font='9px Fira Code'; ctx.textAlign='center';
+    ctx.fillText('θ·X·M', w*0.6, h*0.82);
+  }
+
+  // Nonlinearity annotation
+  if(Math.abs(p.k)>0.05){
+    ctx.fillStyle='#f0883e'; ctx.font='9px Fira Code'; ctx.textAlign='center';
+    ctx.fillText('tanh(κ·M)', w*0.5, h*0.42);
+  }
+
+  // Nodes
+  [[X,'X','#58a6ff'],[M,'M','#3fb950'],[Y,'Y','#f0883e']].forEach(([pos,k,col])=>{
+    ctx.beginPath(); ctx.arc(pos[0],pos[1],r,0,Math.PI*2);
+    ctx.fillStyle='#161b22'; ctx.strokeStyle=col; ctx.lineWidth=2;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#f0f6fc'; ctx.font='bold 13px Fira Code';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(k, pos[0], pos[1]);
   });
 
-  // regression line
-  const lr=linreg(xs,ys);
-  ctx.strokeStyle='#ef444488';ctx.lineWidth=2;ctx.setLineDash([4,4]);
-  ctx.beginPath();
-  ctx.moveTo(px(xmin),py(lr.a+lr.b*xmin));
-  ctx.lineTo(px(xmax),py(lr.a+lr.b*xmax));
-  ctx.stroke();ctx.setLineDash([]);
+  // Labels
+  ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#3fb950'; ctx.font='9px Fira Code'; ctx.textAlign='center';
+  ctx.fillText('γ', (X[0]+M[0])/2-10, (X[1]+M[1])/2+2);
+  ctx.fillText('δ', (M[0]+Y[0])/2+10, (M[1]+Y[1])/2+2);
+  ctx.fillStyle='#58a6ff';
+  ctx.fillText('α', (X[0]+Y[0])/2, (X[1]+Y[1])/2+14);
 }
 
-function drawDoScatter0(a,b,c){
-  const {ctx,w,h}=setupCanvas('c0b',220);
+// ── Draw decomposition bar ────────────────────────
+function drawBar(NDE, NIE, TE, se_NDE, se_NIE){
+  const {ctx,w,h} = getCtx('c_bar',150);
   ctx.clearRect(0,0,w,h);
-  // After do(Ice): Ice is set externally, season can't drive it
-  const N=150;
-  const pts=[];
-  for(let i=0;i<N;i++){
-    const season=(Math.random()<0.5)?1:-1;
-    const ice=(Math.random()-0.5)*3;
-    const drown=b*season+c*ice+0.3*randn();
-    pts.push({ice,drown});
-  }
-  const xs=pts.map(p=>p.ice);
-  const ys=pts.map(p=>p.drown);
-  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
-  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
-  const px2=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
-  const py2=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
-
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('do(Ice Cream)',w/2-40,h-8);
-
-  pts.forEach(p=>{
-    ctx.beginPath();ctx.arc(px2(p.ice),py2(p.drown),3,0,Math.PI*2);
-    ctx.fillStyle='rgba(245,158,11,0.5)';ctx.fill();
-  });
-
-  const lr=linreg(xs,ys);
-  ctx.strokeStyle=Math.abs(lr.b-c)<0.15?'#10b981':'#ef4444';
-  ctx.lineWidth=2;ctx.setLineDash([4,4]);
-  ctx.beginPath();
-  ctx.moveTo(px2(xmin),py2(lr.a+lr.b*xmin));
-  ctx.lineTo(px2(xmax),py2(lr.a+lr.b*xmax));
-  ctx.stroke();ctx.setLineDash([]);
-
-  ctx.fillStyle='#10b981';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('slope≈'+lr.b.toFixed(2)+' (true='+c.toFixed(2)+')',px2(xmin)+4,py2(lr.a+lr.b*xmin)-8);
-}
-
-// ────────────────────────────────────────────────
-// SCENE 1: Backdoor
-// ────────────────────────────────────────────────
-let adjZ=false;
-function setAdj(v){
-  adjZ=v;
-  document.getElementById('btn_adj').classList.toggle('active',v);
-  document.getElementById('btn_unadj').classList.toggle('active',!v);
-  sim1();
-}
-
-function sim1(){
-  const zx=+document.getElementById('s1_zx').value;
-  const zy=+document.getElementById('s1_zy').value;
-  const xy=+document.getElementById('s1_xy').value;
-  document.getElementById('s1_zx_v').textContent=zx.toFixed(1);
-  document.getElementById('s1_zy_v').textContent=zy.toFixed(1);
-  document.getElementById('s1_xy_v').textContent=xy.toFixed(1);
-
-  const N=300;
-  const pts=[];
-  for(let i=0;i<N;i++){
-    const z=randn();
-    const x=zx*z+0.5*randn();
-    const y=xy*x+zy*z+0.4*randn();
-    const zhigh=z>0;
-    pts.push({x,y,z,zhigh});
-  }
-
-  drawDAG1();
-  drawScatter1(pts,xy);
-
-  const xs=pts.map(p=>p.x);
-  const ys=pts.map(p=>p.y);
-  const naive=linreg(xs,ys).b;
-
-  // Adjusted: within-Z-stratum regression averaged
-  const hi=pts.filter(p=>p.zhigh);
-  const lo=pts.filter(p=>!p.zhigh);
-  const bhi=linreg(hi.map(p=>p.x),hi.map(p=>p.y)).b;
-  const blo=linreg(lo.map(p=>p.x),lo.map(p=>p.y)).b;
-  const adj=(bhi+blo)/2;
-
-  document.getElementById('res1').innerHTML=
-    `<span class="label">True causal X→Y (β):     </span><span class="val-do">${xy.toFixed(3)}</span><br>`+
-    `<span class="label">Naive estimate E[Y|X]:    </span><span class="val-obs">${naive.toFixed(3)}</span> <span class="badge badge-${Math.abs(naive-xy)>0.15?'bad':'obs'}">bias=${(naive-xy).toFixed(3)}</span><br>`+
-    `<span class="label">Adjusted for Z:           </span><span class="val-ok">${adj.toFixed(3)}</span> <span class="badge badge-causal">≈ do(X)</span><br>`+
-    `<span class="label">Active display:           </span><span class="${adjZ?'val-ok':'val-obs'}">${adjZ?'Backdoor-adjusted':'Unadjusted'}</span>`;
-}
-
-function drawDAG1(){
-  const {ctx,w,h}=setupCanvas('c1dag',160);
-  ctx.clearRect(0,0,w,h);
-  const nodes={Z:[w/2,30],X:[w*0.2,h-40],Y:[w*0.8,h-40]};
-  function arrow(from,to,col){
-    const dx=to[0]-from[0],dy=to[1]-from[1];
-    const len=Math.sqrt(dx*dx+dy*dy);
-    const ux=dx/len,uy=dy/len;
-    const sx=from[0]+ux*22,sy=from[1]+uy*22;
-    const ex=to[0]-ux*22,ey=to[1]-uy*22;
-    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
-    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-    ctx.fillStyle=col;
-    const angle=Math.atan2(ey-sy,ex-sx);
-    ctx.beginPath();ctx.moveTo(ex,ey);
-    ctx.lineTo(ex-10*Math.cos(angle-0.4),ey-10*Math.sin(angle-0.4));
-    ctx.lineTo(ex-10*Math.cos(angle+0.4),ey-10*Math.sin(angle+0.4));
-    ctx.closePath();ctx.fill();
-  }
-  arrow(nodes.Z,nodes.X,'#ef4444');
-  arrow(nodes.Z,nodes.Y,'#ef4444');
-  arrow(nodes.X,nodes.Y,'#f59e0b');
-
-  for(const [k,pos] of Object.entries(nodes)){
-    ctx.beginPath();ctx.arc(pos[0],pos[1],20,0,Math.PI*2);
-    ctx.fillStyle='#111720';ctx.strokeStyle=k==='Z'?'#ef4444':k==='X'?'#3b82f6':'#10b981';
-    ctx.lineWidth=2;ctx.fill();ctx.stroke();
-    ctx.fillStyle='#e2e8f0';ctx.font='bold 13px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(k,pos[0],pos[1]);
-  }
-  ctx.textAlign='start';
-  ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('Z = confounder (hidden SES)',10,h-8);
-}
-
-function drawScatter1(pts,xy){
-  const {ctx,w,h}=setupCanvas('c1',260);
-  ctx.clearRect(0,0,w,h);
-  const xs=pts.map(p=>p.x);
-  const ys=pts.map(p=>p.y);
-  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
-  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
-  const px=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
-  const py=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
-
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('Treatment X',w/2-30,h-8);
-  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('Outcome Y',0,0);ctx.restore();
-
-  pts.forEach(p=>{
-    ctx.beginPath();ctx.arc(px(p.x),py(p.y),3,0,Math.PI*2);
-    ctx.fillStyle=p.zhigh?'rgba(16,185,129,0.5)':'rgba(239,68,68,0.5)';
-    ctx.fill();
-  });
-
-  if(!adjZ){
-    const lr=linreg(xs,ys);
-    ctx.strokeStyle='#ef4444';ctx.lineWidth=2.5;ctx.setLineDash([4,4]);
-    ctx.beginPath();ctx.moveTo(px(xmin),py(lr.a+lr.b*xmin));ctx.lineTo(px(xmax),py(lr.a+lr.b*xmax));ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';
-    ctx.fillText('naive slope='+lr.b.toFixed(2),px(xmin)+4,py(lr.a+lr.b*xmin)-8);
-  } else {
-    ['zhigh','zlo'].forEach((g,i)=>{
-      const sub=pts.filter(p=>i===0?p.zhigh:!p.zhigh);
-      const sxs=sub.map(p=>p.x),sys=sub.map(p=>p.y);
-      const lr=linreg(sxs,sys);
-      const col=i===0?'#10b981':'#ef4444';
-      ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
-      const sxmin=Math.min(...sxs),sxmax=Math.max(...sxs);
-      ctx.beginPath();ctx.moveTo(px(sxmin),py(lr.a+lr.b*sxmin));ctx.lineTo(px(sxmax),py(lr.a+lr.b*sxmax));ctx.stroke();
-    });
-    // Show true slope
-    const mx=(xmin+xmax)/2,my=(Math.min(...ys)+Math.max(...ys))/2;
-    ctx.strokeStyle='#f59e0b';ctx.lineWidth=2.5;ctx.setLineDash([2,2]);
-    ctx.beginPath();ctx.moveTo(px(xmin),py(my+xy*(xmin-mx)));ctx.lineTo(px(xmax),py(my+xy*(xmax-mx)));ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='#f59e0b';ctx.font='10px IBM Plex Mono';ctx.fillText('causal slope≈'+xy.toFixed(2),px(xmin)+4,py(my+xy*(xmin-mx))-8);
-  }
-}
-
-// ────────────────────────────────────────────────
-// SCENE 2: do-Calculus / IV
-// ────────────────────────────────────────────────
-function sim2(){
-  const beta=+document.getElementById('s2_b').value;
-  const comp=+document.getElementById('s2_comp').value;
-  const rho=+document.getElementById('s2_rho').value;
-  document.getElementById('s2_b_v').textContent=beta.toFixed(1);
-  document.getElementById('s2_comp_v').textContent=comp.toFixed(2);
-  document.getElementById('s2_rho_v').textContent=rho.toFixed(1);
-
-  const N=500;
-  let xs=[],ys=[],zs=[];
-  for(let i=0;i<N;i++){
-    const z=Math.random()<0.5?1:0;
-    const ux=randn(),uy_raw=randn();
-    const uy=rho*ux+Math.sqrt(1-rho*rho)*uy_raw;
-    const xraw=comp*z+(1-comp)*Math.random()+0.3*ux;
-    const x=xraw>0.5?1:0;
-    const y=beta*x+0.5*uy;
-    xs.push(x);ys.push(y);zs.push(z);
-  }
-
-  const treated=xs.map((x,i)=>x===1?ys[i]:null).filter(v=>v!==null);
-  const control=xs.map((x,i)=>x===0?ys[i]:null).filter(v=>v!==null);
-  const naive=(treated.reduce((a,b)=>a+b,0)/treated.length)-(control.reduce((a,b)=>a+b,0)/control.length);
-
-  // IV estimator: Wald = Cov(Z,Y)/Cov(Z,X)
-  const mz=zs.reduce((a,b)=>a+b,0)/N;
-  const my=ys.reduce((a,b)=>a+b,0)/N;
-  const mx=xs.reduce((a,b)=>a+b,0)/N;
-  let czY=0,czX=0;
-  for(let i=0;i<N;i++){czY+=(zs[i]-mz)*(ys[i]-my);czX+=(zs[i]-mz)*(xs[i]-mx);}
-  const iv=czX===0?NaN:czY/czX;
-
-  drawDAG2();
-  drawBiasPlot2(beta,comp);
-
-  document.getElementById('res2').innerHTML=
-    `<span class="label">True β (drug effect):    </span><span class="val-do">${beta.toFixed(2)}</span><br>`+
-    `<span class="label">Naive E[Y|X=1]−E[Y|X=0]:</span><span class="val-obs">${naive.toFixed(3)}</span> <span class="badge badge-${Math.abs(naive-beta)>0.2?'bad':'obs'}">bias=${(naive-beta).toFixed(3)}</span><br>`+
-    `<span class="label">IV estimator (Wald):     </span><span class="val-ok">${iv.toFixed(3)}</span> <span class="badge badge-causal">≈ do(X)</span><br>`+
-    `<span class="label">Compliance rate:         </span><span class="val-obs">${(comp*100).toFixed(0)}%</span>`;
-}
-
-function drawDAG2(){
-  const {ctx,w,h}=setupCanvas('c2dag',160);
-  ctx.clearRect(0,0,w,h);
-  const nodes={Z:[w*0.15,h/2],X:[w*0.5,h/2],Y:[w*0.85,h/2],U:[w*0.68,30]};
-  function arrow(from,to,col,dashed=false){
-    const dx=to[0]-from[0],dy=to[1]-from[1];
-    const len=Math.sqrt(dx*dx+dy*dy);
-    const ux=dx/len,uy=dy/len;
-    const r=18;
-    const sx=from[0]+ux*r,sy=from[1]+uy*r;
-    const ex=to[0]-ux*r,ey=to[1]-uy*r;
-    ctx.strokeStyle=col;ctx.lineWidth=dashed?1.5:2;
-    ctx.setLineDash(dashed?[4,3]:[]);
-    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle=col;
-    const angle=Math.atan2(ey-sy,ex-sx);
-    ctx.beginPath();ctx.moveTo(ex,ey);
-    ctx.lineTo(ex-9*Math.cos(angle-0.4),ey-9*Math.sin(angle-0.4));
-    ctx.lineTo(ex-9*Math.cos(angle+0.4),ey-9*Math.sin(angle+0.4));
-    ctx.closePath();ctx.fill();
-  }
-  arrow(nodes.Z,nodes.X,'#3b82f6');
-  arrow(nodes.X,nodes.Y,'#f59e0b');
-  arrow(nodes.U,nodes.X,'#ef4444',true);
-  arrow(nodes.U,nodes.Y,'#ef4444',true);
-
-  for(const [k,pos] of Object.entries(nodes)){
-    ctx.beginPath();ctx.arc(pos[0],pos[1],18,0,Math.PI*2);
-    ctx.fillStyle='#111720';
-    ctx.strokeStyle=k==='U'?'#ef4444':k==='Z'?'#3b82f6':k==='X'?'#64748b':'#10b981';
-    ctx.lineWidth=2;ctx.fill();ctx.stroke();
-    ctx.fillStyle='#e2e8f0';ctx.font='bold 11px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(k,pos[0],pos[1]);
-  }
-  ctx.textAlign='start';
-  ctx.fillStyle='#64748b';ctx.font='9px IBM Plex Mono';
-  ctx.fillText('Z=assignment  X=taken  U=hidden',10,h-8);
-}
-
-function drawBiasPlot2(trueBeta,comp){
-  const {ctx,w,h}=setupCanvas('c2',250);
-  ctx.clearRect(0,0,w,h);
-  const rhos=[];
-  const naives=[];
-  const ivs=[];
-  for(let rho=-0.9;rho<=0.9;rho+=0.1){
-    const N=400;let xs=[],ys=[],zs=[];
-    for(let i=0;i<N;i++){
-      const z=Math.random()<0.5?1:0;
-      const ux=randn(),uy_raw=randn();
-      const uy=rho*ux+Math.sqrt(Math.max(0,1-rho*rho))*uy_raw;
-      const xraw=comp*z+(1-comp)*Math.random()+0.3*ux;
-      const x=xraw>0.5?1:0;
-      const y=trueBeta*x+0.5*uy;
-      xs.push(x);ys.push(y);zs.push(z);
-    }
-    const tr=xs.map((x,i)=>x===1?ys[i]:null).filter(v=>v!==null);
-    const ct=xs.map((x,i)=>x===0?ys[i]:null).filter(v=>v!==null);
-    const naive=(tr.reduce((a,b)=>a+b,0)/tr.length)-(ct.reduce((a,b)=>a+b,0)/ct.length);
-    const mz=zs.reduce((a,b)=>a+b,0)/N;
-    const my=ys.reduce((a,b)=>a+b,0)/N;
-    const mx=xs.reduce((a,b)=>a+b,0)/N;
-    let czY=0,czX=0;
-    for(let i=0;i<N;i++){czY+=(zs[i]-mz)*(ys[i]-my);czX+=(zs[i]-mz)*(xs[i]-mx);}
-    rhos.push(rho);
-    naives.push(naive);
-    ivs.push(czX===0?NaN:czY/czX);
-  }
-
-  const ymin=-1.5,ymax=3.5;
-  const px2=(x)=>50+(x+1)/2*(w-70);
-  const py2=(y)=>10+(ymax-y)/(ymax-ymin)*(h-40);
-
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(50,10);ctx.lineTo(50,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('Confounding ρ',w/2-30,h-8);
-
-  // true beta line
-  ctx.strokeStyle='#f59e0b88';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(50,py2(trueBeta));ctx.lineTo(w-10,py2(trueBeta));ctx.stroke();
-  ctx.setLineDash([]);
-
-  // naive
-  ctx.strokeStyle='#ef4444';ctx.lineWidth=2;
-  ctx.beginPath();
-  rhos.forEach((r,i)=>{if(i===0)ctx.moveTo(px2(r),py2(naives[i]));else ctx.lineTo(px2(r),py2(naives[i]));});
-  ctx.stroke();
-
-  // IV
-  ctx.strokeStyle='#10b981';ctx.lineWidth=2;
-  ctx.beginPath();
-  rhos.forEach((r,i)=>{if(!isNaN(ivs[i])){if(i===0||isNaN(ivs[i-1]))ctx.moveTo(px2(r),py2(ivs[i]));else ctx.lineTo(px2(r),py2(ivs[i]));}});
-  ctx.stroke();
-
-  ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';ctx.fillText('Naive E[Y|X]',60,25);
-  ctx.fillStyle='#10b981';ctx.fillText('IV estimator',60,40);
-  ctx.fillStyle='#f59e0b';ctx.fillText('True β='+trueBeta.toFixed(1),w-80,py2(trueBeta)-5);
-}
-
-// ────────────────────────────────────────────────
-// SCENE 3: Mediation
-// ────────────────────────────────────────────────
-function sim3(){
-  const dir=+document.getElementById('s3_dir').value;
-  const xm=+document.getElementById('s3_xm').value;
-  const my=+document.getElementById('s3_my').value;
-  document.getElementById('s3_dir_v').textContent=dir.toFixed(1);
-  document.getElementById('s3_xm_v').textContent=xm.toFixed(1);
-  document.getElementById('s3_my_v').textContent=my.toFixed(1);
-
-  const DE=dir;
-  const IE=xm*my;
-  const TE=DE+IE;
-
-  drawDAG3();
-  drawBar3(DE,IE,TE);
-
-  const pDirect=TE!==0?(DE/TE*100).toFixed(1):'-';
-  const pIndirect=TE!==0?(IE/TE*100).toFixed(1):'-';
-
-  document.getElementById('res3').innerHTML=
-    `<span class="label">Direct Effect (DE):       </span><span class="val-causal" style="color:var(--causal)">${DE.toFixed(3)}</span> <span class="badge badge-causal">${pDirect}%</span><br>`+
-    `<span class="label">Indirect Effect (IE):     </span><span class="val-ok">${IE.toFixed(3)}</span> <span class="badge badge-causal">${pIndirect}%</span><br>`+
-    `<span class="label">Total Effect (TE=DE+IE):  </span><span class="val-obs">${TE.toFixed(3)}</span><br>`+
-    `<span class="label">Policy relevance:         </span><span class="${Math.abs(dir)<0.05?'val-ok':'val-diff'}">${Math.abs(dir)<0.05?'No direct discrimination':'Direct path exists'}</span>`;
-}
-
-function drawDAG3(){
-  const {ctx,w,h}=setupCanvas('c3dag',160);
-  ctx.clearRect(0,0,w,h);
-  const X=[w*0.15,h/2],M=[w*0.5,30],Y=[w*0.85,h/2];
-  function arrow(from,to,col,label=''){
-    const dx=to[0]-from[0],dy=to[1]-from[1];
-    const len=Math.sqrt(dx*dx+dy*dy);
-    const ux=dx/len,uy=dy/len;
-    const sx=from[0]+ux*22,sy=from[1]+uy*22;
-    const ex=to[0]-ux*22,ey=to[1]-uy*22;
-    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
-    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-    ctx.fillStyle=col;
-    const angle=Math.atan2(ey-sy,ex-sx);
-    ctx.beginPath();ctx.moveTo(ex,ey);
-    ctx.lineTo(ex-9*Math.cos(angle-0.4),ey-9*Math.sin(angle-0.4));
-    ctx.lineTo(ex-9*Math.cos(angle+0.4),ey-9*Math.sin(angle+0.4));
-    ctx.closePath();ctx.fill();
-    if(label){
-      ctx.fillStyle=col;ctx.font='9px IBM Plex Mono';ctx.textAlign='center';
-      ctx.fillText(label,(sx+ex)/2-5,(sy+ey)/2-5);
-    }
-  }
-  arrow(X,M,'#10b981','γ');
-  arrow(M,Y,'#10b981','δ');
-  arrow(X,Y,'#f59e0b','α');
-
-  [[X,'X','#3b82f6'],[M,'M','#10b981'],[Y,'Y','#f59e0b']].forEach(([pos,k,col])=>{
-    ctx.beginPath();ctx.arc(pos[0],pos[1],20,0,Math.PI*2);
-    ctx.fillStyle='#111720';ctx.strokeStyle=col;ctx.lineWidth=2;ctx.fill();ctx.stroke();
-    ctx.fillStyle='#e2e8f0';ctx.font='bold 12px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(k,pos[0],pos[1]);
-  });
-  ctx.textAlign='start';ctx.fillStyle='#64748b';ctx.font='9px IBM Plex Mono';
-  ctx.fillText('X=Gender  M=Qualification  Y=Hiring',10,h-8);
-}
-
-function drawBar3(DE,IE,TE){
-  const {ctx,w,h}=setupCanvas('c3bar',240);
-  ctx.clearRect(0,0,w,h);
+  const pad={l:16,r:16,t:20,b:30};
+  const bh=30, gap=16;
   const bars=[
-    {label:'Direct Effect',val:DE,color:'#f59e0b'},
-    {label:'Indirect Effect',val:IE,color:'#10b981'},
-    {label:'Total Effect',val:TE,color:'#3b82f6'},
+    {label:'NDE', val:NDE, se:se_NDE, col:'#58a6ff'},
+    {label:'NIE', val:NIE, se:se_NIE, col:'#3fb950'},
+    {label:'TE',  val:TE,  se:0,      col:'#f0883e'},
   ];
-  const maxV=Math.max(...bars.map(b=>Math.abs(b.val)),0.5);
-  const bh=50,gap=20,left=130;
-  const zero=left+(w-left-20)/2;
-  const scale=(w-left-40)/2/maxV;
-
-  bars.forEach((b,i)=>{
-    const y=20+i*(bh+gap);
-    const bw=Math.abs(b.val)*scale;
-    const bx=b.val>=0?zero:zero-bw;
-    ctx.fillStyle=b.color+'33';
-    ctx.strokeStyle=b.color;ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.rect(bx,y,bw,bh);ctx.fill();ctx.stroke();
-    ctx.fillStyle=b.color;ctx.font='bold 13px IBM Plex Mono';ctx.textAlign='right';ctx.textBaseline='middle';
-    ctx.fillText(b.val.toFixed(2),bx+(b.val>=0?-6:bw+6),y+bh/2);
-    ctx.fillStyle='#e2e8f0';ctx.font='11px IBM Plex Sans';ctx.textAlign='right';
-    ctx.fillText(b.label,left-10,y+bh/2);
-  });
+  const maxV = Math.max(...bars.map(b=>Math.abs(b.val)), 0.1);
+  const scale=(w-pad.l-pad.r)/2/maxV;
+  const zero=pad.l+(w-pad.l-pad.r)/2;
 
   // zero line
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(zero,10);ctx.lineTo(zero,h-10);ctx.stroke();
-}
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(zero,pad.t-4); ctx.lineTo(zero,h-pad.b+4); ctx.stroke();
 
-// ────────────────────────────────────────────────
-// SCENE 4: Counterfactuals / PN
-// ────────────────────────────────────────────────
-function sim4(){
-  const pt=+document.getElementById('s4_pt').value;
-  const pc=+document.getElementById('s4_pc').value;
-  const bias=+document.getElementById('s4_bias').value;
-  document.getElementById('s4_pt_v').textContent=pt.toFixed(2);
-  document.getElementById('s4_pc_v').textContent=pc.toFixed(2);
-  document.getElementById('s4_bias_v').textContent=bias.toFixed(2);
+  bars.forEach((b,i)=>{
+    const y=pad.t+i*(bh+gap);
+    const bw=Math.abs(b.val)*scale;
+    const bx=b.val>=0?zero:zero-bw;
 
-  const RR=pt/pc;
-  const ERR=(pt-pc)/pt;  // (RR-1)/RR
-  const pt_do=pt-bias;
-  const PN_corrected=(pt-pc)/pt+(pc-pt_do)/(pt*1); // simplified
+    ctx.fillStyle=b.col+'30';
+    ctx.strokeStyle=b.col; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.roundRect(bx,y,bw,bh,2); ctx.fill(); ctx.stroke();
 
-  // Response types (under monotonicity: no one harmed)
-  // P(always) = pc, P(helped) = pt-pc, P(never) = 1-pt
-  const pAlways=Math.max(0,pc);
-  const pHelped=Math.max(0,pt-pc);
-  const pNever=Math.max(0,1-pt);
-  const pHurt=Math.max(0,1-pAlways-pHelped-pNever);
-
-  drawPie4(pAlways,pHelped,pHurt,pNever);
-  drawRRPlot4();
-
-  document.getElementById('res4').innerHTML=
-    `<span class="label">Risk Ratio RR:            </span><span class="val-obs">${RR.toFixed(3)}</span><br>`+
-    `<span class="label">ERR = (RR−1)/RR:          </span><span class="val-obs">${ERR.toFixed(3)}</span> <span class="badge badge-obs">lower bound PN</span><br>`+
-    `<span class="label">P(helped by drug):        </span><span class="val-do">${pHelped.toFixed(3)}</span><br>`+
-    `<span class="label">PN lower bound:           </span><span class="val-ok">${Math.max(0,ERR).toFixed(3)}</span><br>`+
-    `<span class="label">Legal threshold (PN>0.5): </span><span class="${ERR>0.5?'val-ok':'val-diff'}">${ERR>0.5?'Probable cause':'Below threshold'}</span>`;
-}
-
-function drawPie4(pA,pH,pHt,pN){
-  const {ctx,w,h}=setupCanvas('c4pie',200);
-  ctx.clearRect(0,0,w,h);
-  const total=pA+pH+pHt+pN||1;
-  const slices=[
-    {p:pA/total,col:'#10b981',label:'Always'},
-    {p:pH/total,col:'#f59e0b',label:'Helped'},
-    {p:pHt/total,col:'#ef4444',label:'Hurt'},
-    {p:pN/total,col:'#475569',label:'Never'},
-  ];
-  const cx=w/2,cy=h/2,r=Math.min(w,h)/2-20;
-  let angle=-Math.PI/2;
-  slices.forEach(s=>{
-    const sweep=s.p*Math.PI*2;
-    ctx.beginPath();ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,r,angle,angle+sweep);
-    ctx.closePath();
-    ctx.fillStyle=s.col+'cc';ctx.fill();
-    ctx.strokeStyle='#0a0e14';ctx.lineWidth=2;ctx.stroke();
-    if(s.p>0.05){
-      const midA=angle+sweep/2;
-      ctx.fillStyle='#fff';ctx.font='bold 11px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText((s.p*100).toFixed(0)+'%',cx+Math.cos(midA)*r*0.65,cy+Math.sin(midA)*r*0.65);
+    // SE whisker
+    if(b.se>0){
+      const ex=bx+bw;
+      const se_px=b.se*scale;
+      ctx.strokeStyle=b.col+'99'; ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(ex-se_px, y+bh/2); ctx.lineTo(ex+se_px, y+bh/2);
+      ctx.moveTo(ex-se_px, y+bh/2-5); ctx.lineTo(ex-se_px, y+bh/2+5);
+      ctx.moveTo(ex+se_px, y+bh/2-5); ctx.lineTo(ex+se_px, y+bh/2+5);
+      ctx.stroke();
     }
-    angle+=sweep;
+
+    // value label
+    ctx.fillStyle=b.col; ctx.font='bold 11px Fira Code'; ctx.textAlign='left';
+    ctx.textBaseline='middle';
+    const valX = b.val>=0 ? bx+bw+6 : bx-6;
+    ctx.textAlign = b.val>=0 ? 'left' : 'right';
+    ctx.fillText(b.val.toFixed(3), valX, y+bh/2);
+
+    // label
+    ctx.fillStyle='#8b949e'; ctx.font='10px Fira Code'; ctx.textAlign='center';
+    ctx.fillText(b.label, zero, y+bh+gap*0.45);
   });
 }
 
-function drawRRPlot4(){
-  const {ctx,w,h}=setupCanvas('c4rr',200);
+// ── Draw E[Y|x,m] surface ─────────────────────────
+function drawSurface(model, p){
+  const {ctx,w,h} = getCtx('c_surface',200);
   ctx.clearRect(0,0,w,h);
-  const rrs=[];
-  const pnLo=[];
-  const pnUp=[];
-  for(let rr=1;rr<=10;rr+=0.2){
-    const pt=Math.min(0.99,0.3*rr);
-    const pc=0.3;
-    const lo=Math.max(0,(pt-pc)/pt);
-    const up=Math.min(1,(pt-pc+pc*0)/(pt)); // simplified
-    rrs.push(rr);pnLo.push(lo);pnUp.push(up);
+  const pad={l:42,r:16,t:12,b:32};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+
+  // x values: just x1 and x0
+  const cols = [{x:p.x0,col:'#58a6ff'},{x:p.x1,col:'#f0883e'}];
+  const ms=[];
+  for(let i=0;i<=80;i++) ms.push(-3+i*6/80);
+
+  let ymin=Infinity,ymax=-Infinity;
+  cols.forEach(c=>{
+    ms.forEach(m=>{
+      const y=model.E_Y(c.x,m,p);
+      if(y<ymin)ymin=y; if(y>ymax)ymax=y;
+    });
+  });
+  ymin-=0.1; ymax+=0.1;
+
+  const px2=(m)=>pad.l+(m+3)/6*pw;
+  const py2=(y)=>pad.t+(ymax-y)/(ymax-ymin)*ph;
+
+  axes(ctx,w,h,pad,'M (mediator)','E[Y|x,m]');
+
+  // Grid
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=0.5;
+  for(let i=0;i<=4;i++){
+    const yg=ymin+(ymax-ymin)*i/4;
+    ctx.beginPath();ctx.moveTo(pad.l,py2(yg));ctx.lineTo(w-pad.r,py2(yg));ctx.stroke();
+    ctx.fillStyle='#8b949e'; ctx.font='9px Fira Code'; ctx.textAlign='right';
+    ctx.textBaseline='middle';
+    ctx.fillText(yg.toFixed(1),pad.l-3,py2(yg));
   }
-  const px2=(x)=>50+(x-1)/9*(w-70);
-  const py2=(y)=>10+(1-y)*(h-40);
 
-  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(50,10);ctx.lineTo(50,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
-  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
-  ctx.fillText('Risk Ratio (RR)',w/2-40,h-8);
-  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('PN',0,0);ctx.restore();
+  cols.forEach(c=>{
+    ctx.strokeStyle=c.col; ctx.lineWidth=2; ctx.setLineDash([]);
+    ctx.beginPath();
+    ms.forEach((m,i)=>{
+      const y=model.E_Y(c.x,m,p);
+      if(i===0) ctx.moveTo(px2(m),py2(y));
+      else ctx.lineTo(px2(m),py2(y));
+    });
+    ctx.stroke();
 
-  // fill between bounds
-  ctx.fillStyle='rgba(59,130,246,0.15)';
-  ctx.beginPath();
-  rrs.forEach((r,i)=>i===0?ctx.moveTo(px2(r),py2(pnLo[i])):ctx.lineTo(px2(r),py2(pnLo[i])));
-  rrs.slice().reverse().forEach((r,i)=>{const j=rrs.length-1-i;ctx.lineTo(px2(r),py2(pnUp[j]));});
-  ctx.closePath();ctx.fill();
+    // label at right edge
+    const yl=model.E_Y(c.x,ms[ms.length-1],p);
+    ctx.fillStyle=c.col; ctx.font='9px Fira Code'; ctx.textAlign='left';
+    ctx.textBaseline='middle';
+    ctx.fillText('x='+c.x.toFixed(2),px2(3)+3,py2(yl));
+  });
 
-  ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;
-  ctx.beginPath();rrs.forEach((r,i)=>i===0?ctx.moveTo(px2(r),py2(pnLo[i])):ctx.lineTo(px2(r),py2(pnLo[i])));ctx.stroke();
-
-  // legal threshold line
-  ctx.strokeStyle='#ef444488';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(50,py2(0.5));ctx.lineTo(w-10,py2(0.5));ctx.stroke();
+  // Mark M(x') and M(x) means
+  const mMean0 = p.g*p.x0;
+  const mMean1 = p.g*p.x1;
+  ctx.strokeStyle='#8b949e44'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  [mMean0,mMean1].forEach((mm,i)=>{
+    const col=i===0?'#58a6ff':'#f0883e';
+    if(mm>=-3 && mm<=3){
+      ctx.strokeStyle=col+'77';
+      ctx.beginPath(); ctx.moveTo(px2(mm),pad.t); ctx.lineTo(px2(mm),h-pad.b); ctx.stroke();
+    }
+  });
   ctx.setLineDash([]);
-  ctx.fillStyle='#ef4444';ctx.font='9px IBM Plex Mono';ctx.textAlign='left';
-  ctx.fillText('legal threshold PN=0.5',55,py2(0.5)-5);
 }
 
-// ────────────────────────────────────────────────
-// TAB SWITCHING
-// ────────────────────────────────────────────────
-function switchTab(i){
-  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',i===j));
-  document.querySelectorAll('.scene').forEach((s,j)=>s.classList.toggle('active',i===j));
-  setTimeout(()=>{
-    if(i===0)sim0();
-    if(i===1)sim1();
-    if(i===2)sim2();
-    if(i===3)sim3();
-    if(i===4)sim4();
-  },50);
+// ── Draw M distributions ─────────────────────────
+function drawMdist(model, p){
+  const {ctx,w,h} = getCtx('c_mdist',180);
+  ctx.clearRect(0,0,w,h);
+  const pad={l:40,r:16,t:14,b:32};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+  const N=1500;
+  const m0s=[], m1s=[];
+  for(let i=0;i<N;i++){
+    m0s.push(model.sampleM(p.x0,p));
+    m1s.push(model.sampleM(p.x1,p));
+  }
+
+  // Histogram
+  const bins=30;
+  const mmin=-4, mmax=4;
+  function hist(arr){
+    const h2=new Array(bins).fill(0);
+    arr.forEach(v=>{
+      const b=Math.floor((v-mmin)/(mmax-mmin)*bins);
+      if(b>=0&&b<bins) h2[b]++;
+    });
+    return h2;
+  }
+  const h0=hist(m0s), h1=hist(m1s);
+  const hmax=Math.max(...h0,...h1,1);
+  const bw=pw/bins;
+  const px2=(m)=>pad.l+(m-mmin)/(mmax-mmin)*pw;
+  const py2=(c)=>pad.t+(1-c/hmax)*ph;
+
+  axes(ctx,w,h,pad,'M value','density');
+
+  // bars
+  h0.forEach((c,i)=>{
+    const x=pad.l+i*bw, ht=(c/hmax)*ph;
+    ctx.fillStyle='#58a6ff33'; ctx.strokeStyle='#58a6ff66'; ctx.lineWidth=0.5;
+    ctx.fillRect(x, h-pad.b-ht, bw, ht);
+    ctx.strokeRect(x, h-pad.b-ht, bw, ht);
+  });
+  h1.forEach((c,i)=>{
+    const x=pad.l+i*bw, ht=(c/hmax)*ph;
+    ctx.fillStyle='#f0883e33'; ctx.strokeStyle='#f0883e66'; ctx.lineWidth=0.5;
+    ctx.fillRect(x, h-pad.b-ht, bw, ht);
+    ctx.strokeRect(x, h-pad.b-ht, bw, ht);
+  });
+
+  ctx.fillStyle='#58a6ff'; ctx.font='9px Fira Code'; ctx.textAlign='left';
+  ctx.fillText('P(M|x′)', pad.l+4, pad.t+12);
+  ctx.fillStyle='#f0883e';
+  ctx.fillText('P(M|x)',  pad.l+4, pad.t+24);
+}
+
+// ── Draw NDE/NIE sweep ────────────────────────────
+function drawSweep(model, p){
+  const {ctx,w,h} = getCtx('c_sweep',180);
+  ctx.clearRect(0,0,w,h);
+  const pad={l:42,r:16,t:14,b:32};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+
+  const {alphas, ndes, nies, tes} = sweepAlpha(model,p);
+  const all=[...ndes,...nies,...tes];
+  const ymin=Math.min(...all)-0.2, ymax=Math.max(...all)+0.2;
+  const px2=(a)=>pad.l+(a+2)/4*pw;
+  const py2=(y)=>pad.t+(ymax-y)/(ymax-ymin)*ph;
+
+  axes(ctx,w,h,pad,'α (direct)','effect');
+
+  // zero
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.moveTo(pad.l,py2(0)); ctx.lineTo(w-pad.r,py2(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  function drawLine(arr, col, lw=2){
+    ctx.strokeStyle=col; ctx.lineWidth=lw;
+    ctx.beginPath();
+    alphas.forEach((a,i)=>{
+      if(i===0) ctx.moveTo(px2(a),py2(arr[i]));
+      else ctx.lineTo(px2(a),py2(arr[i]));
+    });
+    ctx.stroke();
+  }
+
+  drawLine(tes, '#f0883e', 1.5);
+  drawLine(ndes,'#58a6ff', 2);
+  drawLine(nies,'#3fb950', 2);
+
+  // current α marker
+  const ci=alphas.findIndex(a=>Math.abs(a-p.a)<0.15);
+  if(ci>=0){
+    ctx.strokeStyle='#ffffff55'; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(px2(alphas[ci]),pad.t); ctx.lineTo(px2(alphas[ci]),h-pad.b); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.fillStyle='#58a6ff'; ctx.font='9px Fira Code'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText('NDE', pad.l+4, pad.t+2);
+  ctx.fillStyle='#3fb950';
+  ctx.fillText('NIE', pad.l+4, pad.t+14);
+  ctx.fillStyle='#f0883e';
+  ctx.fillText('TE',  pad.l+4, pad.t+26);
+}
+
+// ── Draw counterfactual scatter ───────────────────
+function drawCF(model, p){
+  const {ctx,w,h} = getCtx('c_cf',180);
+  ctx.clearRect(0,0,w,h);
+  const pad={l:42,r:16,t:14,b:32};
+  const pw=w-pad.l-pad.r, ph=h-pad.t-pad.b;
+
+  const N=400;
+  const pts=[];
+  for(let i=0;i<N;i++){
+    const m0=model.sampleM(p.x0,p);
+    const m1=model.sampleM(p.x1,p);
+    const y_nat = model.E_Y(p.x1, m1, p); // Y(x,M(x))  — factual
+    const y_cf  = model.E_Y(p.x1, m0, p); // Y(x,M(x')) — counterfactual (NIE contribution)
+    pts.push({y_cf, y_nat});
+  }
+
+  const all=[...pts.map(p2=>p2.y_cf),...pts.map(p2=>p2.y_nat)];
+  const vmin=Math.min(...all)-0.1, vmax=Math.max(...all)+0.1;
+  const px2=(y)=>pad.l+(y-vmin)/(vmax-vmin)*pw;
+  const py2=(y)=>pad.t+(vmax-y)/(vmax-vmin)*ph;
+
+  axes(ctx,w,h,pad,'Y(x, M(x′)) — counterfactual','Y(x, M(x)) — natural');
+
+  // diagonal
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(pad.l,h-pad.b); ctx.lineTo(w-pad.r,pad.t); ctx.stroke();
+  ctx.setLineDash([]);
+
+  pts.forEach(pt=>{
+    const above = pt.y_nat > pt.y_cf;
+    ctx.beginPath(); ctx.arc(px2(pt.y_cf),py2(pt.y_nat),2.5,0,Math.PI*2);
+    ctx.fillStyle=above?'#3fb95066':'#58a6ff66';
+    ctx.fill();
+  });
+
+  ctx.fillStyle='#3fb950'; ctx.font='9px Fira Code'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText('above diagonal: M(x)>M(x′) helped', pad.l+4, pad.t+2);
+}
+
+// ── Main render ──────────────────────────────────
+function go(){
+  // sync value labels
+  [['p_x1','v_x1',2],['p_x0','v_x0',2],
+   ['p_a','v_a',1],['p_g','v_g',1],['p_d','v_d',1],
+   ['p_t','v_t',1],['p_k','v_k',1],
+   ['p_s','v_s',2],['p_n','v_n',0]
+  ].forEach(([id,vid,f])=>sv(id,vid,f));
+
+  const p = getP();
+  const model = MODELS[MODEL];
+
+  // SCM display
+  const {text, annot} = model.scm(p);
+  document.getElementById('scm_display').textContent = text;
+  document.getElementById('model_annot').textContent = annot;
+
+  // Mediation
+  const {NDE, NIE, TE, se_NDE, se_NIE} = mcMediation(model, p);
+
+  const pct = v => TE!==0 ? (v/TE*100).toFixed(1)+'%' : '—';
+
+  // Inconsistency flags
+  const inconsistent = (NDE*TE<0)||(NIE*TE<0);
+  const suppression  = NDE*NIE<0;
+
+  let resultHTML = `
+<span class="rlab">Model:                  </span><span class="r-TE">${model.label}</span><br>
+<span class="rlab">x → x′:                 </span><span style="color:var(--text)">${p.x1.toFixed(2)} → ${p.x0.toFixed(2)}</span><br>
+<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+<span class="rlab">NDE = E[Y(x,M(x′))]−…: </span><span class="r-NDE">${NDE.toFixed(4)}</span> <span class="badge b-NDE">±${(1.96*se_NDE).toFixed(3)}</span> ${pct(NDE)!=='—'?'<span class="badge b-NDE">'+pct(NDE)+'</span>':''}<br>
+<span class="rlab">NIE = E[Y(x,M(x))]−…:  </span><span class="r-NIE">${NIE.toFixed(4)}</span> <span class="badge b-NIE">±${(1.96*se_NIE).toFixed(3)}</span> ${pct(NIE)!=='—'?'<span class="badge b-NIE">'+pct(NIE)+'</span>':''}<br>
+<span class="rlab">TE  = NDE + NIE:        </span><span class="r-TE">${TE.toFixed(4)}</span><br>
+<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
+<span class="rlab">Proportion mediated:    </span><span class="${Math.abs(NIE/TE||0)>0.5?'r-NIE':'r-NDE'}">${TE!==0?(NIE/TE*100).toFixed(1)+'%':'—'}</span><br>
+<span class="rlab">Inconsistent mediation: </span><span class="${inconsistent?'r-warn':'r-ok'}">${inconsistent?'YES — sign reversal!':'No'}</span><br>
+<span class="rlab">Effect modification:    </span><span class="${suppression?'r-int':'r-ok'}">${suppression?'NDE and NIE opposite signs':'None'}</span>
+  `.trim();
+
+  document.getElementById('result_box').innerHTML = resultHTML;
+
+  // Banner
+  const banner = document.getElementById('banner_inconsist');
+  if(inconsistent){
+    banner.className='banner warn active';
+    banner.innerHTML='⚠ Inconsistent mediation: NDE and/or NIE have opposite sign to TE.<br>This means the linear proportion-mediated heuristic is meaningless here.';
+  } else if(suppression){
+    banner.className='banner warn active';
+    banner.innerHTML='⚠ Suppression: NDE and NIE partially cancel. Total effect understates each component.';
+  } else {
+    banner.className='banner';
+  }
+
+  // Row visibility
+  document.getElementById('row_int').style.opacity = MODEL===3?'1':'0.35';
+  document.getElementById('row_nl').style.opacity  = MODEL===4?'1':'0.35';
+
+  // Draws
+  drawDAG(p);
+  drawBar(NDE, NIE, TE, se_NDE, se_NIE);
+  drawSurface(model, p);
+  drawMdist(model, p);
+  drawSweep(model, p);
+  drawCF(model, p);
+}
+
+function setModel(i){
+  MODEL = i;
+  document.querySelectorAll('.mtab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  go();
 }
 
 // Init
-sim0();
-
-window.addEventListener('resize',()=>{
-  const active=[...document.querySelectorAll('.scene')].findIndex(s=>s.classList.contains('active'));
-  switchTab(active);
-});
+window.addEventListener('resize', ()=>go());
+go();
 </script>
 </body>
 </html>

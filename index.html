@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pearl's Causal Inference — Interactive Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap');
+
+  :root {
+    --bg: #0a0e14;
+    --panel: #111720;
+    --border: #1e2d40;
+    --obs: #3b82f6;
+    --causal: #f59e0b;
+    --confound: #ef4444;
+    --mediator: #10b981;
+    --text: #e2e8f0;
+    --dim: #64748b;
+    --bright: #f8fafc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--causal);
+    letter-spacing: -0.02em;
+  }
+
+  header span {
+    font-size: 0.75rem;
+    color: var(--dim);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    padding: 0 32px;
+    overflow-x: auto;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 0.78rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--causal); border-bottom-color: var(--causal); }
+
+  .scene { display: none; padding: 24px 32px; }
+  .scene.active { display: block; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media(max-width:700px){ .two-col { grid-template-columns:1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+
+  .card h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--causal);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .card p, .card li {
+    font-size: 0.82rem;
+    color: var(--dim);
+    line-height: 1.6;
+    margin-bottom: 6px;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    border-radius: 4px;
+    background: #080c11;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slider-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--dim);
+    width: 140px;
+    flex-shrink: 0;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--causal);
+    cursor: pointer;
+  }
+
+  .val-display {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--bright);
+    width: 40px;
+    text-align: right;
+  }
+
+  .result-box {
+    background: #080c11;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-top: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.8;
+  }
+
+  .result-box .label { color: var(--dim); }
+  .result-box .val-obs { color: var(--obs); font-weight: 600; }
+  .result-box .val-do { color: var(--causal); font-weight: 600; }
+  .result-box .val-diff { color: var(--confound); font-weight: 600; }
+  .result-box .val-ok { color: var(--mediator); font-weight: 600; }
+
+  button.btn {
+    padding: 8px 18px;
+    background: transparent;
+    border: 1px solid var(--causal);
+    color: var(--causal);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    transition: all 0.15s;
+  }
+  button.btn:hover { background: var(--causal); color: #000; }
+  button.btn.active { background: var(--causal); color: #000; }
+
+  .dot-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 10px;
+  }
+  .dot-legend span {
+    font-size: 0.72rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot-legend .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .formula {
+    background: #080c11;
+    border-left: 3px solid var(--causal);
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--bright);
+    margin: 10px 0;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .badge-obs { background: #1e3a5f; color: var(--obs); }
+  .badge-causal { background: #422006; color: var(--causal); }
+  .badge-bad { background: #3b1515; color: var(--confound); }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    margin-top: 10px;
+  }
+  table.data-table th {
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: left;
+  }
+  table.data-table td {
+    padding: 5px 8px;
+    color: var(--text);
+    border-bottom: 1px solid #151e2b;
+  }
+  table.data-table tr:hover td { background: #12192b; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pearl's Structural Causal Model</h1>
+  <span>Interactive Simulation — R-350 (2009)</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0)">1 · Association vs Causation</div>
+  <div class="tab" onclick="switchTab(1)">2 · Confounding & Backdoor</div>
+  <div class="tab" onclick="switchTab(2)">3 · do-Calculus</div>
+  <div class="tab" onclick="switchTab(3)">4 · Mediation</div>
+  <div class="tab" onclick="switchTab(4)">5 · Counterfactuals</div>
+</div>
+
+<!-- SCENE 0: Association vs Causation -->
+<div class="scene active" id="scene0">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <h3>The Ladder of Causation</h3>
+        <p>Pearl's key insight: <em>correlation ≠ causation</em> is not just a warning — it's a formal distinction. Three distinct questions require three different mathematical tools.</p>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
+          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--obs);">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--obs);margin-bottom:4px;">RUNG 1 · ASSOCIATION</div>
+            <div style="font-size:0.78rem;color:var(--dim);">P(Y | X=x) — seeing, observing. "What does observing X tell me about Y?"</div>
+          </div>
+          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--causal);">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--causal);margin-bottom:4px;">RUNG 2 · INTERVENTION</div>
+            <div style="font-size:0.78rem;color:var(--dim);">P(Y | do(X=x)) — doing. "What happens to Y if I <em>set</em> X to x?"</div>
+          </div>
+          <div style="padding:10px 14px;background:#080c11;border-radius:4px;border-left:3px solid var(--mediator);">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--mediator);margin-bottom:4px;">RUNG 3 · COUNTERFACTUAL</div>
+            <div style="font-size:0.78rem;color:var(--dim);">P(Yₓ=y' | X=x, Y=y) — imagining. "Would Y have been different had X been x'?"</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>Simulate: Ice Cream & Drowning</h3>
+        <p style="margin-bottom:10px;">Classic spurious correlation. Both are driven by hidden <em>Season</em>. Adjust the confounder strength.</p>
+        <div class="controls">
+          <div class="slider-row">
+            <span class="slider-label">Season → Ice cream</span>
+            <input type="range" id="s0_a" min="0" max="2" step="0.1" value="1.2" oninput="sim0()">
+            <span class="val-display" id="s0_a_v">1.2</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Season → Drowning</span>
+            <input type="range" id="s0_b" min="0" max="2" step="0.1" value="1.0" oninput="sim0()">
+            <span class="val-display" id="s0_b_v">1.0</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Direct Ice→Drowning</span>
+            <input type="range" id="s0_c" min="-0.5" max="0.5" step="0.05" value="0" oninput="sim0()">
+            <span class="val-display" id="s0_c_v">0.00</span>
+          </div>
+        </div>
+        <div class="result-box" id="res0">
+          Calculating…
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Scatter: Ice Cream Sales vs Drownings</h3>
+        <canvas id="c0" height="280"></canvas>
+        <div class="dot-legend" style="margin-top:8px;">
+          <span><span class="dot" style="background:var(--obs)"></span> Summer</span>
+          <span><span class="dot" style="background:var(--causal)"></span> Winter</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>What changes with do(Ice=high)?</h3>
+        <p>When we <em>intervene</em> (do-calculus), we sever the arrow Season→IceCream. The spurious correlation disappears.</p>
+        <canvas id="c0b" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 1: Confounding & Backdoor -->
+<div class="scene" id="scene1">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <h3>Backdoor Criterion</h3>
+        <p>A set S blocks all <em>backdoor paths</em> from X to Y (paths with arrow pointing into X). Once blocked, the naive regression <em>equals</em> the causal effect.</p>
+        <div class="formula">P(Y|do(X)) = Σ_s P(Y|X,S=s)·P(S=s)</div>
+        <p style="margin-top:8px;">Below: Treatment X → Outcome Y, but both share confounder Z (e.g. socioeconomic status). Toggle whether you adjust for Z.</p>
+        <div class="controls" style="margin-top:14px;">
+          <div class="slider-row">
+            <span class="slider-label">Z → X (conf. strength)</span>
+            <input type="range" id="s1_zx" min="0" max="1.5" step="0.1" value="1.0" oninput="sim1()">
+            <span class="val-display" id="s1_zx_v">1.0</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Z → Y (conf. strength)</span>
+            <input type="range" id="s1_zy" min="0" max="1.5" step="0.1" value="0.8" oninput="sim1()">
+            <span class="val-display" id="s1_zy_v">0.8</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">True X → Y effect</span>
+            <input type="range" id="s1_xy" min="-1" max="2" step="0.1" value="0.5" oninput="sim1()">
+            <span class="val-display" id="s1_xy_v">0.5</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button class="btn active" id="btn_unadj" onclick="setAdj(false)">Unadjusted</button>
+            <button class="btn" id="btn_adj" onclick="setAdj(true)">Adjust for Z</button>
+          </div>
+        </div>
+        <div class="result-box" id="res1">Calculating…</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>DAG: X ← Z → Y, X → Y</h3>
+        <canvas id="c1dag" height="160"></canvas>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>Regression line: naive vs adjusted</h3>
+        <canvas id="c1" height="260"></canvas>
+        <div class="dot-legend">
+          <span><span class="dot" style="background:var(--confound)"></span>Z low</span>
+          <span><span class="dot" style="background:var(--mediator)"></span>Z high</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 2: do-calculus -->
+<div class="scene" id="scene2">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <h3>Intervention vs Observation</h3>
+        <p>Drug trial with partial compliance. Z = assigned treatment, X = treatment actually taken, Y = outcome. UX,UY are correlated (confounded).</p>
+        <div class="formula">P(Y|X=1) ≠ P(Y|do(X=1))</div>
+        <p style="margin-top:8px;">The difference is confounding bias. With randomized Z as instrument, we can recover the true causal effect via IV estimator.</p>
+        <div class="controls" style="margin-top:14px;">
+          <div class="slider-row">
+            <span class="slider-label">True drug effect β</span>
+            <input type="range" id="s2_b" min="-1" max="2" step="0.1" value="1.0" oninput="sim2()">
+            <span class="val-display" id="s2_b_v">1.0</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Compliance rate</span>
+            <input type="range" id="s2_comp" min="0.1" max="1" step="0.05" value="0.7" oninput="sim2()">
+            <span class="val-display" id="s2_comp_v">0.70</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">UX–UY correlation</span>
+            <input type="range" id="s2_rho" min="-0.9" max="0.9" step="0.1" value="0.7" oninput="sim2()">
+            <span class="val-display" id="s2_rho_v">0.7</span>
+          </div>
+        </div>
+        <div class="result-box" id="res2">Calculating…</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Clinical Trial DAG</h3>
+        <canvas id="c2dag" height="160"></canvas>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>Bias as function of confounding ρ</h3>
+        <canvas id="c2" height="250"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 3: Mediation -->
+<div class="scene" id="scene3">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <h3>Direct vs Indirect Effects</h3>
+        <p>X → Y (direct) and X → M → Y (via mediator M). Pearl's mediation formula decomposes total effect into direct + indirect.</p>
+        <div class="formula">TE = DE + IE (linear case)</div>
+        <div class="formula" style="border-left-color:var(--mediator)">IE = Σ_m E[Y|x,m]·[P(m|x')−P(m|x)]</div>
+        <p style="margin-top:8px;">Example: Gender → Qualification → Hiring, plus Gender → Hiring directly (discrimination).</p>
+        <div class="controls" style="margin-top:14px;">
+          <div class="slider-row">
+            <span class="slider-label">X → Y direct (α)</span>
+            <input type="range" id="s3_dir" min="-1" max="2" step="0.1" value="0.3" oninput="sim3()">
+            <span class="val-display" id="s3_dir_v">0.3</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">X → M (γ)</span>
+            <input type="range" id="s3_xm" min="-1" max="2" step="0.1" value="0.8" oninput="sim3()">
+            <span class="val-display" id="s3_xm_v">0.8</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">M → Y (δ)</span>
+            <input type="range" id="s3_my" min="-1" max="2" step="0.1" value="0.9" oninput="sim3()">
+            <span class="val-display" id="s3_my_v">0.9</span>
+          </div>
+        </div>
+        <div class="result-box" id="res3">Calculating…</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Mediation DAG</h3>
+        <canvas id="c3dag" height="160"></canvas>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>Effect decomposition bar</h3>
+        <canvas id="c3bar" height="240"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 4: Counterfactuals -->
+<div class="scene" id="scene4">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <h3>Probability of Necessity (PN)</h3>
+        <p>Given a patient <em>took the drug and recovered</em>, what's the probability they would have died <em>without</em> it? This is PN — a Rung 3 (counterfactual) query.</p>
+        <div class="formula">PN = P(Yx'=0 | X=x, Y=1)</div>
+        <p style="margin-top:8px;">With monotonicity assumption (drug can only help), Pearl shows:</p>
+        <div class="formula" style="font-size:0.72rem">PN ≥ (RR − 1)/RR where RR = P(Y=1|X=1)/P(Y=1|X=0)</div>
+        <div class="controls" style="margin-top:14px;">
+          <div class="slider-row">
+            <span class="slider-label">P(recover | treated)</span>
+            <input type="range" id="s4_pt" min="0.01" max="0.99" step="0.01" value="0.75" oninput="sim4()">
+            <span class="val-display" id="s4_pt_v">0.75</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">P(recover | control)</span>
+            <input type="range" id="s4_pc" min="0.01" max="0.99" step="0.01" value="0.40" oninput="sim4()">
+            <span class="val-display" id="s4_pc_v">0.40</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Confounding bias</span>
+            <input type="range" id="s4_bias" min="-0.3" max="0.3" step="0.01" value="0.0" oninput="sim4()">
+            <span class="val-display" id="s4_bias_v">0.00</span>
+          </div>
+        </div>
+        <div class="result-box" id="res4">Calculating…</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Individual Response Types</h3>
+        <p style="margin-bottom:10px;font-size:0.78rem;">Four possible response types for a binary treatment/outcome. Counterfactual analysis constrains their proportions.</p>
+        <canvas id="c4pie" height="200"></canvas>
+        <div class="dot-legend" style="margin-top:10px;">
+          <span><span class="dot" style="background:#10b981"></span>Always recover</span>
+          <span><span class="dot" style="background:var(--causal)"></span>Helped by drug</span>
+          <span><span class="dot" style="background:var(--confound)"></span>Hurt by drug</span>
+          <span><span class="dot" style="background:var(--dim)"></span>Never recover</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>PN bounds as function of RR</h3>
+        <canvas id="c4rr" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+// UTILITIES
+// ────────────────────────────────────────────────
+function randn() {
+  let u=0,v=0;
+  while(u===0)u=Math.random();
+  while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+function linreg(xs,ys){
+  const n=xs.length;
+  let mx=0,my=0;
+  for(let i=0;i<n;i++){mx+=xs[i];my+=ys[i];}
+  mx/=n;my/=n;
+  let num=0,den=0;
+  for(let i=0;i<n;i++){num+=(xs[i]-mx)*(ys[i]-my);den+=(xs[i]-mx)**2;}
+  const b=den===0?0:num/den;
+  const a=my-b*mx;
+  return {a,b};
+}
+
+function corr(xs,ys){
+  const n=xs.length;
+  let mx=0,my=0;
+  for(let i=0;i<n;i++){mx+=xs[i];my+=ys[i];}
+  mx/=n;my/=n;
+  let num=0,dx2=0,dy2=0;
+  for(let i=0;i<n;i++){
+    const dx=xs[i]-mx,dy=ys[i]-my;
+    num+=dx*dy;dx2+=dx*dx;dy2+=dy*dy;
+  }
+  return num/Math.sqrt(dx2*dy2);
+}
+
+function setupCanvas(id,h){
+  const canvas=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.parentElement.getBoundingClientRect();
+  const w=rect.width-40;
+  canvas.style.width=w+'px';
+  canvas.style.height=h+'px';
+  canvas.width=w*dpr;
+  canvas.height=h*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return {ctx,w,h};
+}
+
+// ────────────────────────────────────────────────
+// SCENE 0: Spurious Correlation
+// ────────────────────────────────────────────────
+let scene0data=[];
+function sim0(){
+  const a=+document.getElementById('s0_a').value;
+  const b=+document.getElementById('s0_b').value;
+  const c=+document.getElementById('s0_c').value;
+  document.getElementById('s0_a_v').textContent=a.toFixed(1);
+  document.getElementById('s0_b_v').textContent=b.toFixed(1);
+  document.getElementById('s0_c_v').textContent=c.toFixed(2);
+
+  const N=200;
+  scene0data=[];
+  for(let i=0;i<N;i++){
+    const season=(i<N/2)?1:-1; // summer=1, winter=-1
+    const ice=a*season+0.3*randn();
+    const drown=b*season+c*ice+0.3*randn();
+    scene0data.push({ice,drown,summer:season>0});
+  }
+  drawScatter0();
+  const xs=scene0data.map(d=>d.ice);
+  const ys=scene0data.map(d=>d.drown);
+  const r=corr(xs,ys).toFixed(3);
+  const lr=linreg(xs,ys);
+
+  // Simulated do: remove season->ice link, keep c only
+  const N2=200;
+  let biasArr=[];
+  for(let i=0;i<N2;i++){
+    const season=(Math.random()<0.5)?1:-1;
+    const ice_obs=a*season+0.3*randn();
+    const ice_do=randn()*0.3; // do: set ice randomly, season no longer drives it
+    const y_obs=b*season+c*ice_obs+0.3*randn();
+    const y_do=b*season+c*ice_do+0.3*randn();
+    biasArr.push({obs_slope:lr.b, do_slope:c});
+  }
+
+  document.getElementById('res0').innerHTML=
+    `<span class="label">Observed corr(Ice,Drown): </span><span class="val-obs">${r}</span><br>`+
+    `<span class="label">Obs. regression slope:    </span><span class="val-obs">${lr.b.toFixed(3)}</span> <span class="badge badge-obs">P(Y|X)</span><br>`+
+    `<span class="label">True causal slope (β):    </span><span class="val-do">${c.toFixed(3)}</span> <span class="badge badge-causal">P(Y|do(X))</span><br>`+
+    `<span class="label">Confounding bias:         </span><span class="val-diff">${(lr.b-c).toFixed(3)}</span><br>`+
+    `<span class="label">Conclusion:               </span><span class="${Math.abs(lr.b-c)<0.05?'val-ok':'val-diff'}">${Math.abs(lr.b-c)<0.05?'No confounding':'Spurious!'}</span>`;
+
+  drawDoScatter0(a,b,c);
+}
+
+function drawScatter0(){
+  const {ctx,w,h}=setupCanvas('c0',280);
+  ctx.clearRect(0,0,w,h);
+  const xs=scene0data.map(d=>d.ice);
+  const ys=scene0data.map(d=>d.drown);
+  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
+  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
+  const px=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
+  const py=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
+
+  // axes
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('Ice Cream Sales',w/2-40,h-8);
+  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('Drownings',0,0);ctx.restore();
+
+  scene0data.forEach(d=>{
+    ctx.beginPath();
+    ctx.arc(px(d.ice),py(d.drown),3.5,0,Math.PI*2);
+    ctx.fillStyle=d.summer?'rgba(59,130,246,0.7)':'rgba(245,158,11,0.7)';
+    ctx.fill();
+  });
+
+  // regression line
+  const lr=linreg(xs,ys);
+  ctx.strokeStyle='#ef444488';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(px(xmin),py(lr.a+lr.b*xmin));
+  ctx.lineTo(px(xmax),py(lr.a+lr.b*xmax));
+  ctx.stroke();ctx.setLineDash([]);
+}
+
+function drawDoScatter0(a,b,c){
+  const {ctx,w,h}=setupCanvas('c0b',220);
+  ctx.clearRect(0,0,w,h);
+  // After do(Ice): Ice is set externally, season can't drive it
+  const N=150;
+  const pts=[];
+  for(let i=0;i<N;i++){
+    const season=(Math.random()<0.5)?1:-1;
+    const ice=(Math.random()-0.5)*3;
+    const drown=b*season+c*ice+0.3*randn();
+    pts.push({ice,drown});
+  }
+  const xs=pts.map(p=>p.ice);
+  const ys=pts.map(p=>p.drown);
+  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
+  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
+  const px2=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
+  const py2=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
+
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('do(Ice Cream)',w/2-40,h-8);
+
+  pts.forEach(p=>{
+    ctx.beginPath();ctx.arc(px2(p.ice),py2(p.drown),3,0,Math.PI*2);
+    ctx.fillStyle='rgba(245,158,11,0.5)';ctx.fill();
+  });
+
+  const lr=linreg(xs,ys);
+  ctx.strokeStyle=Math.abs(lr.b-c)<0.15?'#10b981':'#ef4444';
+  ctx.lineWidth=2;ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(px2(xmin),py2(lr.a+lr.b*xmin));
+  ctx.lineTo(px2(xmax),py2(lr.a+lr.b*xmax));
+  ctx.stroke();ctx.setLineDash([]);
+
+  ctx.fillStyle='#10b981';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('slope≈'+lr.b.toFixed(2)+' (true='+c.toFixed(2)+')',px2(xmin)+4,py2(lr.a+lr.b*xmin)-8);
+}
+
+// ────────────────────────────────────────────────
+// SCENE 1: Backdoor
+// ────────────────────────────────────────────────
+let adjZ=false;
+function setAdj(v){
+  adjZ=v;
+  document.getElementById('btn_adj').classList.toggle('active',v);
+  document.getElementById('btn_unadj').classList.toggle('active',!v);
+  sim1();
+}
+
+function sim1(){
+  const zx=+document.getElementById('s1_zx').value;
+  const zy=+document.getElementById('s1_zy').value;
+  const xy=+document.getElementById('s1_xy').value;
+  document.getElementById('s1_zx_v').textContent=zx.toFixed(1);
+  document.getElementById('s1_zy_v').textContent=zy.toFixed(1);
+  document.getElementById('s1_xy_v').textContent=xy.toFixed(1);
+
+  const N=300;
+  const pts=[];
+  for(let i=0;i<N;i++){
+    const z=randn();
+    const x=zx*z+0.5*randn();
+    const y=xy*x+zy*z+0.4*randn();
+    const zhigh=z>0;
+    pts.push({x,y,z,zhigh});
+  }
+
+  drawDAG1();
+  drawScatter1(pts,xy);
+
+  const xs=pts.map(p=>p.x);
+  const ys=pts.map(p=>p.y);
+  const naive=linreg(xs,ys).b;
+
+  // Adjusted: within-Z-stratum regression averaged
+  const hi=pts.filter(p=>p.zhigh);
+  const lo=pts.filter(p=>!p.zhigh);
+  const bhi=linreg(hi.map(p=>p.x),hi.map(p=>p.y)).b;
+  const blo=linreg(lo.map(p=>p.x),lo.map(p=>p.y)).b;
+  const adj=(bhi+blo)/2;
+
+  document.getElementById('res1').innerHTML=
+    `<span class="label">True causal X→Y (β):     </span><span class="val-do">${xy.toFixed(3)}</span><br>`+
+    `<span class="label">Naive estimate E[Y|X]:    </span><span class="val-obs">${naive.toFixed(3)}</span> <span class="badge badge-${Math.abs(naive-xy)>0.15?'bad':'obs'}">bias=${(naive-xy).toFixed(3)}</span><br>`+
+    `<span class="label">Adjusted for Z:           </span><span class="val-ok">${adj.toFixed(3)}</span> <span class="badge badge-causal">≈ do(X)</span><br>`+
+    `<span class="label">Active display:           </span><span class="${adjZ?'val-ok':'val-obs'}">${adjZ?'Backdoor-adjusted':'Unadjusted'}</span>`;
+}
+
+function drawDAG1(){
+  const {ctx,w,h}=setupCanvas('c1dag',160);
+  ctx.clearRect(0,0,w,h);
+  const nodes={Z:[w/2,30],X:[w*0.2,h-40],Y:[w*0.8,h-40]};
+  function arrow(from,to,col){
+    const dx=to[0]-from[0],dy=to[1]-from[1];
+    const len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len,uy=dy/len;
+    const sx=from[0]+ux*22,sy=from[1]+uy*22;
+    const ex=to[0]-ux*22,ey=to[1]-uy*22;
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.fillStyle=col;
+    const angle=Math.atan2(ey-sy,ex-sx);
+    ctx.beginPath();ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-10*Math.cos(angle-0.4),ey-10*Math.sin(angle-0.4));
+    ctx.lineTo(ex-10*Math.cos(angle+0.4),ey-10*Math.sin(angle+0.4));
+    ctx.closePath();ctx.fill();
+  }
+  arrow(nodes.Z,nodes.X,'#ef4444');
+  arrow(nodes.Z,nodes.Y,'#ef4444');
+  arrow(nodes.X,nodes.Y,'#f59e0b');
+
+  for(const [k,pos] of Object.entries(nodes)){
+    ctx.beginPath();ctx.arc(pos[0],pos[1],20,0,Math.PI*2);
+    ctx.fillStyle='#111720';ctx.strokeStyle=k==='Z'?'#ef4444':k==='X'?'#3b82f6':'#10b981';
+    ctx.lineWidth=2;ctx.fill();ctx.stroke();
+    ctx.fillStyle='#e2e8f0';ctx.font='bold 13px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(k,pos[0],pos[1]);
+  }
+  ctx.textAlign='start';
+  ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('Z = confounder (hidden SES)',10,h-8);
+}
+
+function drawScatter1(pts,xy){
+  const {ctx,w,h}=setupCanvas('c1',260);
+  ctx.clearRect(0,0,w,h);
+  const xs=pts.map(p=>p.x);
+  const ys=pts.map(p=>p.y);
+  const xmin=Math.min(...xs)-0.3,xmax=Math.max(...xs)+0.3;
+  const ymin=Math.min(...ys)-0.3,ymax=Math.max(...ys)+0.3;
+  const px=(x)=>40+(x-xmin)/(xmax-xmin)*(w-60);
+  const py=(y)=>h-30-(y-ymin)/(ymax-ymin)*(h-50);
+
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(40,10);ctx.lineTo(40,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('Treatment X',w/2-30,h-8);
+  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('Outcome Y',0,0);ctx.restore();
+
+  pts.forEach(p=>{
+    ctx.beginPath();ctx.arc(px(p.x),py(p.y),3,0,Math.PI*2);
+    ctx.fillStyle=p.zhigh?'rgba(16,185,129,0.5)':'rgba(239,68,68,0.5)';
+    ctx.fill();
+  });
+
+  if(!adjZ){
+    const lr=linreg(xs,ys);
+    ctx.strokeStyle='#ef4444';ctx.lineWidth=2.5;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(px(xmin),py(lr.a+lr.b*xmin));ctx.lineTo(px(xmax),py(lr.a+lr.b*xmax));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';
+    ctx.fillText('naive slope='+lr.b.toFixed(2),px(xmin)+4,py(lr.a+lr.b*xmin)-8);
+  } else {
+    ['zhigh','zlo'].forEach((g,i)=>{
+      const sub=pts.filter(p=>i===0?p.zhigh:!p.zhigh);
+      const sxs=sub.map(p=>p.x),sys=sub.map(p=>p.y);
+      const lr=linreg(sxs,sys);
+      const col=i===0?'#10b981':'#ef4444';
+      ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
+      const sxmin=Math.min(...sxs),sxmax=Math.max(...sxs);
+      ctx.beginPath();ctx.moveTo(px(sxmin),py(lr.a+lr.b*sxmin));ctx.lineTo(px(sxmax),py(lr.a+lr.b*sxmax));ctx.stroke();
+    });
+    // Show true slope
+    const mx=(xmin+xmax)/2,my=(Math.min(...ys)+Math.max(...ys))/2;
+    ctx.strokeStyle='#f59e0b';ctx.lineWidth=2.5;ctx.setLineDash([2,2]);
+    ctx.beginPath();ctx.moveTo(px(xmin),py(my+xy*(xmin-mx)));ctx.lineTo(px(xmax),py(my+xy*(xmax-mx)));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#f59e0b';ctx.font='10px IBM Plex Mono';ctx.fillText('causal slope≈'+xy.toFixed(2),px(xmin)+4,py(my+xy*(xmin-mx))-8);
+  }
+}
+
+// ────────────────────────────────────────────────
+// SCENE 2: do-Calculus / IV
+// ────────────────────────────────────────────────
+function sim2(){
+  const beta=+document.getElementById('s2_b').value;
+  const comp=+document.getElementById('s2_comp').value;
+  const rho=+document.getElementById('s2_rho').value;
+  document.getElementById('s2_b_v').textContent=beta.toFixed(1);
+  document.getElementById('s2_comp_v').textContent=comp.toFixed(2);
+  document.getElementById('s2_rho_v').textContent=rho.toFixed(1);
+
+  const N=500;
+  let xs=[],ys=[],zs=[];
+  for(let i=0;i<N;i++){
+    const z=Math.random()<0.5?1:0;
+    const ux=randn(),uy_raw=randn();
+    const uy=rho*ux+Math.sqrt(1-rho*rho)*uy_raw;
+    const xraw=comp*z+(1-comp)*Math.random()+0.3*ux;
+    const x=xraw>0.5?1:0;
+    const y=beta*x+0.5*uy;
+    xs.push(x);ys.push(y);zs.push(z);
+  }
+
+  const treated=xs.map((x,i)=>x===1?ys[i]:null).filter(v=>v!==null);
+  const control=xs.map((x,i)=>x===0?ys[i]:null).filter(v=>v!==null);
+  const naive=(treated.reduce((a,b)=>a+b,0)/treated.length)-(control.reduce((a,b)=>a+b,0)/control.length);
+
+  // IV estimator: Wald = Cov(Z,Y)/Cov(Z,X)
+  const mz=zs.reduce((a,b)=>a+b,0)/N;
+  const my=ys.reduce((a,b)=>a+b,0)/N;
+  const mx=xs.reduce((a,b)=>a+b,0)/N;
+  let czY=0,czX=0;
+  for(let i=0;i<N;i++){czY+=(zs[i]-mz)*(ys[i]-my);czX+=(zs[i]-mz)*(xs[i]-mx);}
+  const iv=czX===0?NaN:czY/czX;
+
+  drawDAG2();
+  drawBiasPlot2(beta,comp);
+
+  document.getElementById('res2').innerHTML=
+    `<span class="label">True β (drug effect):    </span><span class="val-do">${beta.toFixed(2)}</span><br>`+
+    `<span class="label">Naive E[Y|X=1]−E[Y|X=0]:</span><span class="val-obs">${naive.toFixed(3)}</span> <span class="badge badge-${Math.abs(naive-beta)>0.2?'bad':'obs'}">bias=${(naive-beta).toFixed(3)}</span><br>`+
+    `<span class="label">IV estimator (Wald):     </span><span class="val-ok">${iv.toFixed(3)}</span> <span class="badge badge-causal">≈ do(X)</span><br>`+
+    `<span class="label">Compliance rate:         </span><span class="val-obs">${(comp*100).toFixed(0)}%</span>`;
+}
+
+function drawDAG2(){
+  const {ctx,w,h}=setupCanvas('c2dag',160);
+  ctx.clearRect(0,0,w,h);
+  const nodes={Z:[w*0.15,h/2],X:[w*0.5,h/2],Y:[w*0.85,h/2],U:[w*0.68,30]};
+  function arrow(from,to,col,dashed=false){
+    const dx=to[0]-from[0],dy=to[1]-from[1];
+    const len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len,uy=dy/len;
+    const r=18;
+    const sx=from[0]+ux*r,sy=from[1]+uy*r;
+    const ex=to[0]-ux*r,ey=to[1]-uy*r;
+    ctx.strokeStyle=col;ctx.lineWidth=dashed?1.5:2;
+    ctx.setLineDash(dashed?[4,3]:[]);
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=col;
+    const angle=Math.atan2(ey-sy,ex-sx);
+    ctx.beginPath();ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-9*Math.cos(angle-0.4),ey-9*Math.sin(angle-0.4));
+    ctx.lineTo(ex-9*Math.cos(angle+0.4),ey-9*Math.sin(angle+0.4));
+    ctx.closePath();ctx.fill();
+  }
+  arrow(nodes.Z,nodes.X,'#3b82f6');
+  arrow(nodes.X,nodes.Y,'#f59e0b');
+  arrow(nodes.U,nodes.X,'#ef4444',true);
+  arrow(nodes.U,nodes.Y,'#ef4444',true);
+
+  for(const [k,pos] of Object.entries(nodes)){
+    ctx.beginPath();ctx.arc(pos[0],pos[1],18,0,Math.PI*2);
+    ctx.fillStyle='#111720';
+    ctx.strokeStyle=k==='U'?'#ef4444':k==='Z'?'#3b82f6':k==='X'?'#64748b':'#10b981';
+    ctx.lineWidth=2;ctx.fill();ctx.stroke();
+    ctx.fillStyle='#e2e8f0';ctx.font='bold 11px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(k,pos[0],pos[1]);
+  }
+  ctx.textAlign='start';
+  ctx.fillStyle='#64748b';ctx.font='9px IBM Plex Mono';
+  ctx.fillText('Z=assignment  X=taken  U=hidden',10,h-8);
+}
+
+function drawBiasPlot2(trueBeta,comp){
+  const {ctx,w,h}=setupCanvas('c2',250);
+  ctx.clearRect(0,0,w,h);
+  const rhos=[];
+  const naives=[];
+  const ivs=[];
+  for(let rho=-0.9;rho<=0.9;rho+=0.1){
+    const N=400;let xs=[],ys=[],zs=[];
+    for(let i=0;i<N;i++){
+      const z=Math.random()<0.5?1:0;
+      const ux=randn(),uy_raw=randn();
+      const uy=rho*ux+Math.sqrt(Math.max(0,1-rho*rho))*uy_raw;
+      const xraw=comp*z+(1-comp)*Math.random()+0.3*ux;
+      const x=xraw>0.5?1:0;
+      const y=trueBeta*x+0.5*uy;
+      xs.push(x);ys.push(y);zs.push(z);
+    }
+    const tr=xs.map((x,i)=>x===1?ys[i]:null).filter(v=>v!==null);
+    const ct=xs.map((x,i)=>x===0?ys[i]:null).filter(v=>v!==null);
+    const naive=(tr.reduce((a,b)=>a+b,0)/tr.length)-(ct.reduce((a,b)=>a+b,0)/ct.length);
+    const mz=zs.reduce((a,b)=>a+b,0)/N;
+    const my=ys.reduce((a,b)=>a+b,0)/N;
+    const mx=xs.reduce((a,b)=>a+b,0)/N;
+    let czY=0,czX=0;
+    for(let i=0;i<N;i++){czY+=(zs[i]-mz)*(ys[i]-my);czX+=(zs[i]-mz)*(xs[i]-mx);}
+    rhos.push(rho);
+    naives.push(naive);
+    ivs.push(czX===0?NaN:czY/czX);
+  }
+
+  const ymin=-1.5,ymax=3.5;
+  const px2=(x)=>50+(x+1)/2*(w-70);
+  const py2=(y)=>10+(ymax-y)/(ymax-ymin)*(h-40);
+
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(50,10);ctx.lineTo(50,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('Confounding ρ',w/2-30,h-8);
+
+  // true beta line
+  ctx.strokeStyle='#f59e0b88';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(50,py2(trueBeta));ctx.lineTo(w-10,py2(trueBeta));ctx.stroke();
+  ctx.setLineDash([]);
+
+  // naive
+  ctx.strokeStyle='#ef4444';ctx.lineWidth=2;
+  ctx.beginPath();
+  rhos.forEach((r,i)=>{if(i===0)ctx.moveTo(px2(r),py2(naives[i]));else ctx.lineTo(px2(r),py2(naives[i]));});
+  ctx.stroke();
+
+  // IV
+  ctx.strokeStyle='#10b981';ctx.lineWidth=2;
+  ctx.beginPath();
+  rhos.forEach((r,i)=>{if(!isNaN(ivs[i])){if(i===0||isNaN(ivs[i-1]))ctx.moveTo(px2(r),py2(ivs[i]));else ctx.lineTo(px2(r),py2(ivs[i]));}});
+  ctx.stroke();
+
+  ctx.fillStyle='#ef4444';ctx.font='10px IBM Plex Mono';ctx.fillText('Naive E[Y|X]',60,25);
+  ctx.fillStyle='#10b981';ctx.fillText('IV estimator',60,40);
+  ctx.fillStyle='#f59e0b';ctx.fillText('True β='+trueBeta.toFixed(1),w-80,py2(trueBeta)-5);
+}
+
+// ────────────────────────────────────────────────
+// SCENE 3: Mediation
+// ────────────────────────────────────────────────
+function sim3(){
+  const dir=+document.getElementById('s3_dir').value;
+  const xm=+document.getElementById('s3_xm').value;
+  const my=+document.getElementById('s3_my').value;
+  document.getElementById('s3_dir_v').textContent=dir.toFixed(1);
+  document.getElementById('s3_xm_v').textContent=xm.toFixed(1);
+  document.getElementById('s3_my_v').textContent=my.toFixed(1);
+
+  const DE=dir;
+  const IE=xm*my;
+  const TE=DE+IE;
+
+  drawDAG3();
+  drawBar3(DE,IE,TE);
+
+  const pDirect=TE!==0?(DE/TE*100).toFixed(1):'-';
+  const pIndirect=TE!==0?(IE/TE*100).toFixed(1):'-';
+
+  document.getElementById('res3').innerHTML=
+    `<span class="label">Direct Effect (DE):       </span><span class="val-causal" style="color:var(--causal)">${DE.toFixed(3)}</span> <span class="badge badge-causal">${pDirect}%</span><br>`+
+    `<span class="label">Indirect Effect (IE):     </span><span class="val-ok">${IE.toFixed(3)}</span> <span class="badge badge-causal">${pIndirect}%</span><br>`+
+    `<span class="label">Total Effect (TE=DE+IE):  </span><span class="val-obs">${TE.toFixed(3)}</span><br>`+
+    `<span class="label">Policy relevance:         </span><span class="${Math.abs(dir)<0.05?'val-ok':'val-diff'}">${Math.abs(dir)<0.05?'No direct discrimination':'Direct path exists'}</span>`;
+}
+
+function drawDAG3(){
+  const {ctx,w,h}=setupCanvas('c3dag',160);
+  ctx.clearRect(0,0,w,h);
+  const X=[w*0.15,h/2],M=[w*0.5,30],Y=[w*0.85,h/2];
+  function arrow(from,to,col,label=''){
+    const dx=to[0]-from[0],dy=to[1]-from[1];
+    const len=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/len,uy=dy/len;
+    const sx=from[0]+ux*22,sy=from[1]+uy*22;
+    const ex=to[0]-ux*22,ey=to[1]-uy*22;
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.fillStyle=col;
+    const angle=Math.atan2(ey-sy,ex-sx);
+    ctx.beginPath();ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-9*Math.cos(angle-0.4),ey-9*Math.sin(angle-0.4));
+    ctx.lineTo(ex-9*Math.cos(angle+0.4),ey-9*Math.sin(angle+0.4));
+    ctx.closePath();ctx.fill();
+    if(label){
+      ctx.fillStyle=col;ctx.font='9px IBM Plex Mono';ctx.textAlign='center';
+      ctx.fillText(label,(sx+ex)/2-5,(sy+ey)/2-5);
+    }
+  }
+  arrow(X,M,'#10b981','γ');
+  arrow(M,Y,'#10b981','δ');
+  arrow(X,Y,'#f59e0b','α');
+
+  [[X,'X','#3b82f6'],[M,'M','#10b981'],[Y,'Y','#f59e0b']].forEach(([pos,k,col])=>{
+    ctx.beginPath();ctx.arc(pos[0],pos[1],20,0,Math.PI*2);
+    ctx.fillStyle='#111720';ctx.strokeStyle=col;ctx.lineWidth=2;ctx.fill();ctx.stroke();
+    ctx.fillStyle='#e2e8f0';ctx.font='bold 12px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(k,pos[0],pos[1]);
+  });
+  ctx.textAlign='start';ctx.fillStyle='#64748b';ctx.font='9px IBM Plex Mono';
+  ctx.fillText('X=Gender  M=Qualification  Y=Hiring',10,h-8);
+}
+
+function drawBar3(DE,IE,TE){
+  const {ctx,w,h}=setupCanvas('c3bar',240);
+  ctx.clearRect(0,0,w,h);
+  const bars=[
+    {label:'Direct Effect',val:DE,color:'#f59e0b'},
+    {label:'Indirect Effect',val:IE,color:'#10b981'},
+    {label:'Total Effect',val:TE,color:'#3b82f6'},
+  ];
+  const maxV=Math.max(...bars.map(b=>Math.abs(b.val)),0.5);
+  const bh=50,gap=20,left=130;
+  const zero=left+(w-left-20)/2;
+  const scale=(w-left-40)/2/maxV;
+
+  bars.forEach((b,i)=>{
+    const y=20+i*(bh+gap);
+    const bw=Math.abs(b.val)*scale;
+    const bx=b.val>=0?zero:zero-bw;
+    ctx.fillStyle=b.color+'33';
+    ctx.strokeStyle=b.color;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.rect(bx,y,bw,bh);ctx.fill();ctx.stroke();
+    ctx.fillStyle=b.color;ctx.font='bold 13px IBM Plex Mono';ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(b.val.toFixed(2),bx+(b.val>=0?-6:bw+6),y+bh/2);
+    ctx.fillStyle='#e2e8f0';ctx.font='11px IBM Plex Sans';ctx.textAlign='right';
+    ctx.fillText(b.label,left-10,y+bh/2);
+  });
+
+  // zero line
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(zero,10);ctx.lineTo(zero,h-10);ctx.stroke();
+}
+
+// ────────────────────────────────────────────────
+// SCENE 4: Counterfactuals / PN
+// ────────────────────────────────────────────────
+function sim4(){
+  const pt=+document.getElementById('s4_pt').value;
+  const pc=+document.getElementById('s4_pc').value;
+  const bias=+document.getElementById('s4_bias').value;
+  document.getElementById('s4_pt_v').textContent=pt.toFixed(2);
+  document.getElementById('s4_pc_v').textContent=pc.toFixed(2);
+  document.getElementById('s4_bias_v').textContent=bias.toFixed(2);
+
+  const RR=pt/pc;
+  const ERR=(pt-pc)/pt;  // (RR-1)/RR
+  const pt_do=pt-bias;
+  const PN_corrected=(pt-pc)/pt+(pc-pt_do)/(pt*1); // simplified
+
+  // Response types (under monotonicity: no one harmed)
+  // P(always) = pc, P(helped) = pt-pc, P(never) = 1-pt
+  const pAlways=Math.max(0,pc);
+  const pHelped=Math.max(0,pt-pc);
+  const pNever=Math.max(0,1-pt);
+  const pHurt=Math.max(0,1-pAlways-pHelped-pNever);
+
+  drawPie4(pAlways,pHelped,pHurt,pNever);
+  drawRRPlot4();
+
+  document.getElementById('res4').innerHTML=
+    `<span class="label">Risk Ratio RR:            </span><span class="val-obs">${RR.toFixed(3)}</span><br>`+
+    `<span class="label">ERR = (RR−1)/RR:          </span><span class="val-obs">${ERR.toFixed(3)}</span> <span class="badge badge-obs">lower bound PN</span><br>`+
+    `<span class="label">P(helped by drug):        </span><span class="val-do">${pHelped.toFixed(3)}</span><br>`+
+    `<span class="label">PN lower bound:           </span><span class="val-ok">${Math.max(0,ERR).toFixed(3)}</span><br>`+
+    `<span class="label">Legal threshold (PN>0.5): </span><span class="${ERR>0.5?'val-ok':'val-diff'}">${ERR>0.5?'Probable cause':'Below threshold'}</span>`;
+}
+
+function drawPie4(pA,pH,pHt,pN){
+  const {ctx,w,h}=setupCanvas('c4pie',200);
+  ctx.clearRect(0,0,w,h);
+  const total=pA+pH+pHt+pN||1;
+  const slices=[
+    {p:pA/total,col:'#10b981',label:'Always'},
+    {p:pH/total,col:'#f59e0b',label:'Helped'},
+    {p:pHt/total,col:'#ef4444',label:'Hurt'},
+    {p:pN/total,col:'#475569',label:'Never'},
+  ];
+  const cx=w/2,cy=h/2,r=Math.min(w,h)/2-20;
+  let angle=-Math.PI/2;
+  slices.forEach(s=>{
+    const sweep=s.p*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,angle,angle+sweep);
+    ctx.closePath();
+    ctx.fillStyle=s.col+'cc';ctx.fill();
+    ctx.strokeStyle='#0a0e14';ctx.lineWidth=2;ctx.stroke();
+    if(s.p>0.05){
+      const midA=angle+sweep/2;
+      ctx.fillStyle='#fff';ctx.font='bold 11px IBM Plex Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText((s.p*100).toFixed(0)+'%',cx+Math.cos(midA)*r*0.65,cy+Math.sin(midA)*r*0.65);
+    }
+    angle+=sweep;
+  });
+}
+
+function drawRRPlot4(){
+  const {ctx,w,h}=setupCanvas('c4rr',200);
+  ctx.clearRect(0,0,w,h);
+  const rrs=[];
+  const pnLo=[];
+  const pnUp=[];
+  for(let rr=1;rr<=10;rr+=0.2){
+    const pt=Math.min(0.99,0.3*rr);
+    const pc=0.3;
+    const lo=Math.max(0,(pt-pc)/pt);
+    const up=Math.min(1,(pt-pc+pc*0)/(pt)); // simplified
+    rrs.push(rr);pnLo.push(lo);pnUp.push(up);
+  }
+  const px2=(x)=>50+(x-1)/9*(w-70);
+  const py2=(y)=>10+(1-y)*(h-40);
+
+  ctx.strokeStyle='#1e2d40';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(50,10);ctx.lineTo(50,h-30);ctx.lineTo(w-10,h-30);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='10px IBM Plex Mono';
+  ctx.fillText('Risk Ratio (RR)',w/2-40,h-8);
+  ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('PN',0,0);ctx.restore();
+
+  // fill between bounds
+  ctx.fillStyle='rgba(59,130,246,0.15)';
+  ctx.beginPath();
+  rrs.forEach((r,i)=>i===0?ctx.moveTo(px2(r),py2(pnLo[i])):ctx.lineTo(px2(r),py2(pnLo[i])));
+  rrs.slice().reverse().forEach((r,i)=>{const j=rrs.length-1-i;ctx.lineTo(px2(r),py2(pnUp[j]));});
+  ctx.closePath();ctx.fill();
+
+  ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;
+  ctx.beginPath();rrs.forEach((r,i)=>i===0?ctx.moveTo(px2(r),py2(pnLo[i])):ctx.lineTo(px2(r),py2(pnLo[i])));ctx.stroke();
+
+  // legal threshold line
+  ctx.strokeStyle='#ef444488';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(50,py2(0.5));ctx.lineTo(w-10,py2(0.5));ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ef4444';ctx.font='9px IBM Plex Mono';ctx.textAlign='left';
+  ctx.fillText('legal threshold PN=0.5',55,py2(0.5)-5);
+}
+
+// ────────────────────────────────────────────────
+// TAB SWITCHING
+// ────────────────────────────────────────────────
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  document.querySelectorAll('.scene').forEach((s,j)=>s.classList.toggle('active',i===j));
+  setTimeout(()=>{
+    if(i===0)sim0();
+    if(i===1)sim1();
+    if(i===2)sim2();
+    if(i===3)sim3();
+    if(i===4)sim4();
+  },50);
+}
+
+// Init
+sim0();
+
+window.addEventListener('resize',()=>{
+  const active=[...document.querySelectorAll('.scene')].findIndex(s=>s.classList.contains('active'));
+  switchTab(active);
+});
+</script>
+</body>
+</html>

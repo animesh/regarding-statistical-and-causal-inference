@@ -1,0 +1,13 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Executed copies of notebooks (kept only in /tmp)
+*_executed.ipynb
+
+# OS artefacts
+.DS_Store
